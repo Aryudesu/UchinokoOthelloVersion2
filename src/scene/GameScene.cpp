@@ -1,10 +1,10 @@
 #pragma once
-#include "InputManager.h"
-#include "SceneBase.h"
-#include "GameScene.h"
-#include "Ids.h"
+#include "manager/InputManager.h"
+#include "scene/SceneBase.h"
+#include "scene/GameScene.h"
+#include "core/Ids.h"
+#include "util/Logger.h"
 #include "DxLib.h"
-#include "Logger.h"
 
 void GameScene::Start() {
 }

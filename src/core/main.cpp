@@ -1,9 +1,9 @@
 #include "DxLib.h"
-#include "SceneManager.h"
-#include "Ids.h"
-#include "InputManager.h"
-#include "FramePacer.h"
-#include "Logger.h"
+#include "core/Ids.h"
+#include "core/FramePacer.h"
+#include "manager/SceneManager.h"
+#include "manager/InputManager.h"
+#include "util/Logger.h"
 #include <exception>
 #include <windows.h>
 

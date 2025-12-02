@@ -1,8 +1,8 @@
 #pragma once
 #include <memory>
-#include "Ids.h"
-#include "SceneBase.h"
-#include "SceneFactory.h"
+#include "core/Ids.h"
+#include "scene/SceneBase.h"
+#include "scene/SceneFactory.h"
 
 class SceneManager {
     std::unique_ptr<SceneBase> cur_;

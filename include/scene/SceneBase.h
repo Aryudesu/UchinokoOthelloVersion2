@@ -1,5 +1,5 @@
 #pragma once
-#include "Ids.h"
+#include "core/Ids.h"
 
 class SceneBase {
 	public:

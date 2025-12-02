@@ -1,6 +1,6 @@
 #pragma once
-#include "SceneBase.h"
-#include "Ids.h"
+#include "core/Ids.h"
+#include "scene/SceneBase.h"
 #include "DxLib.h"
 
 class GameScene : public SceneBase {

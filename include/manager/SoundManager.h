@@ -1,5 +1,5 @@
 #pragma once
-#include "Singleton.h"
+#include "core/Singleton.h"
 #include "Dxlib.h"
 #include <vector>
 #include <string>

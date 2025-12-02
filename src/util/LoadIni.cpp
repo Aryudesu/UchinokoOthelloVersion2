@@ -1,4 +1,4 @@
-#include "LoadIni.h"
+#include "util/LoadIni.h"
 #include "DxLib.h"
 #include <cctype>
 #include <cstdlib>

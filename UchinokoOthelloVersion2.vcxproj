@@ -19,29 +19,29 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="FramePacer.cpp" />
-    <ClCompile Include="GameScene.cpp" />
-    <ClCompile Include="ImageManager.cpp" />
-    <ClCompile Include="LoadIni.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="SoundManager.cpp" />
-    <ClCompile Include="TitleScene.cpp" />
+    <ClCompile Include="src\core\FramePacer.cpp" />
+    <ClCompile Include="src\scene\GameScene.cpp" />
+    <ClCompile Include="src\manager\ImageManager.cpp" />
+    <ClCompile Include="src\util\LoadIni.cpp" />
+    <ClCompile Include="src\core\main.cpp" />
+    <ClCompile Include="src\manager\SoundManager.cpp" />
+    <ClCompile Include="src\scene\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="debug.h" />
-    <ClInclude Include="FramePacer.h" />
-    <ClInclude Include="GameScene.h" />
-    <ClInclude Include="Ids.h" />
-    <ClInclude Include="ImageManager.h" />
-    <ClInclude Include="InputManager.h" />
-    <ClInclude Include="LoadIni.h" />
-    <ClInclude Include="Logger.h" />
-    <ClInclude Include="SceneBase.h" />
-    <ClInclude Include="SceneFactory.h" />
-    <ClInclude Include="SceneManager.h" />
-    <ClInclude Include="Singleton.h" />
-    <ClInclude Include="SoundManager.h" />
-    <ClInclude Include="TitleScene.h" />
+    <ClInclude Include="include\util\debug.h" />
+    <ClInclude Include="include\core\FramePacer.h" />
+    <ClInclude Include="include\scene\GameScene.h" />
+    <ClInclude Include="include\core\Ids.h" />
+    <ClInclude Include="include\manager\ImageManager.h" />
+    <ClInclude Include="include\manager\InputManager.h" />
+    <ClInclude Include="include\util\LoadIni.h" />
+    <ClInclude Include="include\util\Logger.h" />
+    <ClInclude Include="include\scene\SceneBase.h" />
+    <ClInclude Include="include\scene\SceneFactory.h" />
+    <ClInclude Include="include\manager\SceneManager.h" />
+    <ClInclude Include="include\core\Singleton.h" />
+    <ClInclude Include="include\manager\SoundManager.h" />
+    <ClInclude Include="include\scene\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
@@ -100,7 +100,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -118,7 +118,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -134,7 +134,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -152,7 +152,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\DxLib_VC\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>

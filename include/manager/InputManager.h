@@ -1,6 +1,6 @@
 #pragma once
 #include "DxLib.h"
-#include "Singleton.h"
+#include "core/Singleton.h"
 #include <array>
 #include <cstdint>
 

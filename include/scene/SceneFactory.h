@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
-#include "SceneBase.h"
-#include "Ids.h"
+#include "core/Ids.h"
+#include "scene/SceneBase.h"
 
 // ここで各具体シーンのヘッダをinclude
 #include "TitleScene.h"

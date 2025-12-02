@@ -1,7 +1,7 @@
-#include "SoundManager.h"
 #include "Dxlib.h"
-#include "InputManager.h"
-#include "Ids.h"
+#include "core/Ids.h"
+#include "manager/SoundManager.h"
+#include "manager/InputManager.h"
 #include <vector>
 #include <string>
 
