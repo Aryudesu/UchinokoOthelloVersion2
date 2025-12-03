@@ -1,21 +1,17 @@
 #pragma once
-#include "core/Singleton.h"
 #include "Dxlib.h"
 #include <vector>
 #include <string>
 
 
-class SoundManager : public Singleton<SoundManager> {
-	std::vector<int> SE;
-	std::vector<int> BGM;
-	int Volume;
-	int SEVolume;
-	int VolumeCount;
-	int SEVolumeCount;
-	int DrawCount;
-	int SoftSoundHandle;
+class SoundManager {
 public:
-	SoundManager();
+	// シングルトンインスタンス取得
+	static SoundManager& GetInstance() {
+		static SoundManager inst;
+		return inst;
+	}
+
 	void SetSE(int Num, std::string FileName);
 	void PlaySE(int Num);
 	void SetBGM(int Num, int LoopPoint, std::string FileName);
@@ -34,4 +30,18 @@ public:
 	int  GetSoftSoundHandle();
 	int  GetSSBGMHandle();
 	int  GetVolume();
+
+private:
+	SoundManager();
+	SoundManager(const SoundManager&) = delete;
+	SoundManager& operator=(const SoundManager&) = delete;
+
+	std::vector<int> SE;
+	std::vector<int> BGM;
+	int Volume;
+	int SEVolume;
+	int VolumeCount;
+	int SEVolumeCount;
+	int DrawCount;
+	int SoftSoundHandle;
 };

@@ -1,40 +1,49 @@
 #include "core/FramePacer.h"
 
 FramePacer::FramePacer()
-    : mStartMs(0), mCount(0), mFps(0.0f) {
+    : mStartMs(0)
+    , mCount(0)
+    , mFps(0.0f)
+{
 }
 
-bool FramePacer::Update() {
+// 1フレームの先頭で呼ぶ
+void FramePacer::Update() {
     if (mCount == 0) {
-        // ブロック先頭フレームで基準時刻を記録
-        mStartMs = static_cast<std::uint32_t>(GetNowCount());
+        // サンプル開始のタイミング
+        mStartMs = GetNowCount();
     }
-    if (mCount == kSampleFrames) {
-        const std::uint32_t t = static_cast<std::uint32_t>(GetNowCount());
-        const float elapsedMs = static_cast<float>(t - mStartMs);
-        // 60フレームぶんの平均FPS
-        if (elapsedMs > 0.0f) {
-            mFps = 1000.0f * kSampleFrames / elapsedMs;
-        }
-        mCount = 0;
-        mStartMs = t;
-    }
+
     ++mCount;
-    return true;
+
+    // 一定フレームごとに実測FPSを更新
+    if (mCount >= kSampleFrames) {
+        std::uint32_t now = GetNowCount();
+        std::uint32_t diff = now - mStartMs;
+        if (diff > 0) {
+            // diff[ms] かかったkSampleFramesフレームからFPSを計算
+            mFps = (1000.0f * kSampleFrames) / static_cast<float>(diff);
+        }
+        else {
+            mFps = 0.0f;
+        }
+        // 次のサンプルのためにリセット
+        mStartMs = now;
+        mCount = 0;
+    }
 }
 
+// 1フレームの最後で呼ぶ
 void FramePacer::Wait() {
-    // ブロック開始からの経過時間
-    const std::uint32_t now = static_cast<std::uint32_t>(GetNowCount());
-    const std::uint32_t tookMs = now - mStartMs;
-    const std::uint32_t idealMs = static_cast<std::uint32_t>(mCount * 1000 / kTargetFps);
+    // サンプル開始からここまでにかかった時間
+    std::uint32_t now = GetNowCount();
+    std::uint32_t elapsed = now - mStartMs;
 
-    if (idealMs > tookMs) {
-        // 1ms手前までWaitTimer、最後は軽く回す
-        const std::uint32_t grossWait = idealMs - tookMs;
-        if (grossWait > 1) {
-            WaitTimer(static_cast<int>(grossWait - 1));
-        }
-        while (static_cast<std::uint32_t>(GetNowCount() - mStartMs) < idealMs) {}
+    // 今のフレーム数が理想的には何ms進んでいてほしいか
+    int targetMs = mCount * 1000 / kTargetFps;
+
+    int waitMs = targetMs - static_cast<int>(elapsed);
+    if (waitMs > 0) {
+        Sleep(waitMs);
     }
 }

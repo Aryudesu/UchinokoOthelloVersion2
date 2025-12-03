@@ -1,19 +1,22 @@
 #pragma once
 #include "DxLib.h"
-#include "core/Singleton.h"
 #include <array>
 #include <cstdint>
 
 constexpr int KEY_NUM = 256;
 
 // キー入力管理
-class InputManager : public Singleton<InputManager> {
-    friend class Singleton<InputManager>;
-
+class InputManager {
 private:
     std::array<uint8_t, KEY_NUM> tmp_{};     // GetHitKeyStateAllの生配列
     std::array<uint32_t, KEY_NUM> hold_{};   // 押下継続フレーム数
 public:
+	// シングルトンインスタンス取得
+    static InputManager& GetInstance() {
+        static InputManager inst;
+        return inst;
+	}
+
     // 毎フレーム先頭で呼ぶ
     int Update() {
         char raw[KEY_NUM];
@@ -38,4 +41,10 @@ public:
     bool isDown(int key) const { return (key >= 0 && key < KEY_NUM) ? tmp_[key] != 0 : false; }
     bool isPressed(int key) const { return (key >= 0 && key < KEY_NUM) ? (hold_[key] == 1) : false; }
     bool isReleased(int key) const { return (key >= 0 && key < KEY_NUM) ? (!tmp_[key] && hold_[key] == 0) : false; }
+
+	// シングルトン取得
+private:
+    InputManager() = default;
+    InputManager(const InputManager&) = delete;
+	InputManager& operator=(const InputManager&) = delete;
 };

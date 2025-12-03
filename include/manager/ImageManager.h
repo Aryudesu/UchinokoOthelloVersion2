@@ -1,5 +1,4 @@
 #pragma once
-#include "core/Singleton.h"
 #include "Dxlib.h"
 #include <vector>
 #include <string>
@@ -7,20 +6,17 @@
 
 //画像管理用クラス
 //とりあえず領域確保と画像読み込み、描画、データ消しまで
-class ImageManager : public Singleton<ImageManager> {
-private:
-	std::vector<std::vector<int>> imgs_;
+class ImageManager {
 public:
-	friend class Singleton < ImageManager >;
-
-	ImageManager() = default;
-	~ImageManager();
-
 	static void safeDelete(int& h) {
 		if (h != -1) { DeleteGraph(h); h = -1; }
 	}
 
-public:
+	//シングルトンインスタンス取得
+	static ImageManager& GetInstance() {
+		static ImageManager inst;
+		return inst;
+	}
 
 	//透過色設定
 	void SetTrans(int R, int G, int B);
@@ -69,4 +65,11 @@ public:
 	void Destroy(int ID);
 
 	void DeleteAll();
+
+private:
+	ImageManager();
+	ImageManager(const ImageManager&) = delete;
+	ImageManager& operator=(const ImageManager&) = delete;
+
+	std::vector<std::vector<int>> imgs_;
 };

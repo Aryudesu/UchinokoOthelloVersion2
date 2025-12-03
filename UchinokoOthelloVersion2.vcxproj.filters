@@ -80,9 +80,6 @@
     <ClInclude Include="include\manager\SceneManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="include\core\Singleton.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="include\manager\SoundManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

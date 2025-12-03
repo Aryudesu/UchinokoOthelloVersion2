@@ -43,7 +43,6 @@
     <ClInclude Include="include\scene\SceneBase.h" />
     <ClInclude Include="include\scene\SceneFactory.h" />
     <ClInclude Include="include\manager\SceneManager.h" />
-    <ClInclude Include="include\core\Singleton.h" />
     <ClInclude Include="include\manager\SoundManager.h" />
     <ClInclude Include="include\scene\TitleScene.h" />
     <ClInclude Include="include\util\Log.h" />
