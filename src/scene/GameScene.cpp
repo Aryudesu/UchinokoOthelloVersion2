@@ -3,7 +3,7 @@
 #include "scene/SceneBase.h"
 #include "scene/GameScene.h"
 #include "core/Ids.h"
-#include "util/Logger.h"
+#include "util/Log.h"
 #include "DxLib.h"
 
 void GameScene::Start() {
