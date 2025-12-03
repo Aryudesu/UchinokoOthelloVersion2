@@ -15,11 +15,6 @@ class SceneManager {
             cur_.reset();
         }
 
-        if (next == SceneID::Quit) {
-            quit_ = true;
-            return;
-        }
-
         cur_ = CreateScene(next);
         if (cur_) {
             cur_->Start();

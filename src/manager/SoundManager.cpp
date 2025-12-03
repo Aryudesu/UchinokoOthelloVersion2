@@ -75,7 +75,7 @@ void SoundManager::ChangeVolume(int V) {
 }
 
 void SoundManager::ChangeBGMVolume(int V) {
-	ChangeVolumeSoundMem(255 * V / 100, BGM[to_i(SoundID::BGM1)]);
+	ChangeVolumeSoundMem(255 * V / 100, BGM[to_underlying(SoundID::BGM1)]);
 }
 
 void SoundManager::ConfBGMVolume() {

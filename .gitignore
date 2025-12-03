@@ -21,6 +21,9 @@ x86/
 *.user
 *.suo
 
+# logs
+.logs/*.txt
+
 # Others
 *.aps
 *.dxa

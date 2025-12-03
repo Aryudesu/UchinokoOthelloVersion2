@@ -1,75 +1,65 @@
 #pragma once
-#include "Dxlib.h"
 #include <vector>
 #include <string>
+#include "core/Ids.h"  // enum class ImageID
 
-
-//画像管理用クラス
-//とりあえず領域確保と画像読み込み、描画、データ消しまで
 class ImageManager {
 public:
-	static void safeDelete(int& h) {
-		if (h != -1) { DeleteGraph(h); h = -1; }
-	}
+    // シングルトンインスタンス取得
+    static ImageManager& GetInstance() {
+        static ImageManager inst;
+        return inst;
+    }
 
-	//シングルトンインスタンス取得
-	static ImageManager& GetInstance() {
-		static ImageManager inst;
-		return inst;
-	}
+    // 透過色設定（DxLib の SetTransColor ラッパ）
+    void SetTrans(int r, int g, int b);
 
-	//透過色設定
-	void SetTrans(int R, int G, int B);
+    // 単一画像読み込み
+    void Load(ImageID id, const std::string& filename);
 
-	//画像読み込み
-	//ID : オブジェクトID
-	//sizex,sizey　縦横切り取るピクセルサイズ
-	//CutX,CutY カット数
-	//FileName　画像ファイル名
-	void Load(int ID, int sizex, int sizey, int CutX, int CutY, std::string FileName);
+    // 分割画像読み込み（任意サイズ）
+    void LoadDiv(ImageID id, int sizex, int sizey,
+        int cutX, int cutY,
+        const std::string& filename);
 
-	//画像読み込み
-	//ID : オブジェクトID
-	//FileName　画像ファイル名
-	void Load(int ID, std::string FileName);
+    // 分割画像読み込み（32x32 固定など、シート用の簡易版）
+    void LoadSheet(ImageID id, int cutX, int cutY, const std::string& filename);
 
-	//画像読み込み
-	//ID : オブジェクトID
-	//CutX,CutY カット数
-	//FileName　画像ファイル名
-	void LoadSheet(int ID, int CutX, int CutY, std::string FileName);
+    // サイズ取得（num 指定）
+    void Size(ImageID id, int num, int& width, int& height) const;
+    // 最初の要素のサイズ
+    void Size(ImageID id, int& width, int& height) const;
 
-	//画像サイズ
-	void Size(int ID, int num, int& width, int& height);
-	void Size(int ID, int& width, int& height);
+    // 描画（スプライト）
+    void Draw(float x, float y,
+        ImageID id, int num = 0,
+        bool transFlag = true, bool turnY = false) const;
 
-	//画像描画
-	//x,y　画面位置
-	//ID,num　オブジェクトIDと描画番号
-	//TransFlag　透過するかしないか　TRUE/FALSE
-	void Draw(float x, float y, int ID, int num, int TransFlag, int TurnY = FALSE);
+    // 画面左上に描画
+    void Draw(ImageID id, bool transFlag = true) const {
+        Draw(0.0f, 0.0f, id, 0, transFlag);
+    }
 
-	//画像描画（0,0に描画）
-	//ID　オブジェクトID
-	//TransFlag　透過するかしないか　TRUE/FALSE
-	void Draw(int ID, int TransFlag);
+    // ID の画像をすべて破棄
+    void Destroy(ImageID id);
 
-	//画像描画
-	//x,y　画面位置
-	//ID,num　オブジェクトIDと描画番号
-	//TransFlag　透過するかしないか　TRUE/FALSE
-	//TurnY　上下反転
-	void Draw(float x, float y, int ID, int TransFlag);
-
-	//IDのオブジェクトの画像破棄
-	void Destroy(int ID);
-
-	void DeleteAll();
+    // 全画像破棄
+    void DeleteAll();
 
 private:
-	ImageManager();
-	ImageManager(const ImageManager&) = delete;
-	ImageManager& operator=(const ImageManager&) = delete;
+    ImageManager();
+    ~ImageManager();
 
-	std::vector<std::vector<int>> imgs_;
+    ImageManager(const ImageManager&) = delete;
+    ImageManager& operator=(const ImageManager&) = delete;
+
+    using Handle = int;
+    std::vector<std::vector<Handle>> imgs_;
+
+    // id からインデックスに変換し、必要なら拡張
+    std::vector<Handle>& getSlot(ImageID id);
+    const std::vector<Handle>& getSlot(ImageID id) const;
+
+    // 安全な削除
+    static void safeDelete(Handle& h);
 };

@@ -15,10 +15,10 @@ enum class SceneID : int {
     Title = 0,
     Game = 1,
     Result = 2,
-    Quit = 3,
 };
 
-constexpr int to_i(ImageID id) noexcept { return static_cast<int>(id); }
-
-constexpr int to_i(SoundID id) noexcept { return static_cast<int>(id); }
+template <class Enum>
+constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept {
+    return static_cast<std::underlying_type_t<Enum>>(e);
+}
 
