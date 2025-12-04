@@ -1,162 +1,168 @@
-#include "Dxlib.h"
-#include "core/Ids.h"
 #include "manager/SoundManager.h"
-#include "manager/InputManager.h"
-#include <vector>
-#include <string>
+#include "core/Ids.h"
+#include <cassert>
 
 SoundManager::SoundManager() {
-	SE.resize(30);
-	BGM.resize(3);
-	DrawCount = 0;
-	Volume = 60;
-	VolumeCount = 0;
-	SEVolume = 50;
-	SEVolumeCount = 0;
-	ChangeBGMVolume(Volume);			//音量
-	ChangeVolume(SEVolume);			    //SE音量
-	SoftSoundHandle = -1;
+    // 初期状態は全部 INVALID_HANDLE にしておく
+    mSE.resize(30, INVALID_HANDLE);
+    // BGMは SoundID の最大値に応じてリサイズしてもいいし、都度ensureでもOK
+    mBGM.resize(4, INVALID_HANDLE);
+    SetSEVolume(mSEVolume);
+    SetBGMVolume(mBGMVolume);
 }
 
-void  SoundManager::SetSE(int Num, std::string FileName) {
-	SE[Num] = LoadSoundMem(FileName.c_str());
+SoundManager::~SoundManager() {
+    // 全SEを破棄
+    for (auto& h : mSE) safeDelete(h);
+    // 全BGMを破棄
+    for (auto& h : mBGM) safeDelete(h);
+    // SoftSound も破棄
+    if (mSoftSoundHandle != INVALID_HANDLE) {
+        DeleteSoftSound(mSoftSoundHandle);
+        mSoftSoundHandle = INVALID_HANDLE;
+    }
 }
 
-void  SoundManager::PlaySE(int Num) {
-	SoundManager::GetInstance().ChangeVolume(SEVolume);
-	PlaySoundMem(SE[Num], DX_PLAYTYPE_BACK);
+void SoundManager::safeDelete(Handle& h) {
+    if (h != INVALID_HANDLE) {
+        DeleteSoundMem(h);
+        h = INVALID_HANDLE;
+    }
 }
 
-void  SoundManager::SetBGM(int Num, int LoopPoint, std::string FileName) {
-	BGM[Num] = LoadSoundMem(FileName.c_str());
-	SetLoopPosSoundMem(LoopPoint, BGM[Num]);
+void SoundManager::ensureSESize(int index) {
+    if (index < 0) return;
+    if (index >= (int)mSE.size()) {
+        mSE.resize(index + 1, INVALID_HANDLE);
+    }
 }
 
-int  SoundManager::SetSSBGM(int Num, int LoopPoint, std::string FileName) {
-	SoftSoundHandle = LoadSoftSound(FileName.c_str());
-	BGM[Num] = LoadSoundMemFromSoftSound(SoftSoundHandle);
-	SetLoopPosSoundMem(LoopPoint, BGM[Num]);
-	return BGM[Num];
+void SoundManager::ensureBGMSize(SoundID id) {
+    int idx = static_cast<int>(id);
+    if (idx < 0) return;
+    if (idx >= (int)mBGM.size()) {
+        mBGM.resize(idx + 1, INVALID_HANDLE);
+    }
 }
 
-void  SoundManager::PlayBGM(int Num) {
-	SoundManager::GetInstance().ChangeBGMVolume(Volume);
-	PlaySoundMem(BGM[Num], DX_PLAYTYPE_LOOP);
+// ---------- SE ----------
+
+void SoundManager::SetSE(int index, const std::string& file) {
+    ensureSESize(index);
+    safeDelete(mSE[index]);
+    mSE[index] = LoadSoundMem(file.c_str());
+    if (mSE[index] != INVALID_HANDLE) {
+        ChangeVolumeSoundMem(255 * mSEVolume / 100, mSE[index]);
+    }
 }
 
-void SoundManager::PlaySSBGM(int Num) {
-	SoundManager::GetInstance().ChangeBGMVolume(Volume);
-	PlaySoundMem(BGM[Num], DX_PLAYTYPE_LOOP);
+void SoundManager::PlaySE(int index) {
+    if (index < 0 || index >= (int)mSE.size()) return;
+    int h = mSE[index];
+    if (h == INVALID_HANDLE) return;
+    PlaySoundMem(h, DX_PLAYTYPE_BACK);
 }
 
-void  SoundManager::StopBGM(int Num) {
-	StopSoundMem(BGM[Num]);
+// ---------- BGM ----------
+
+void SoundManager::SetBGM(SoundID id, int loopSamplePos, const std::string& file) {
+    ensureBGMSize(id);
+    int idx = static_cast<int>(id);
+
+    safeDelete(mBGM[idx]);
+    mBGM[idx] = LoadSoundMem(file.c_str());
+    if (mBGM[idx] != INVALID_HANDLE) {
+        SetLoopPosSoundMem(loopSamplePos, mBGM[idx]);
+        ChangeVolumeSoundMem(255 * mBGMVolume / 100, mBGM[idx]);
+    }
 }
 
-void  SoundManager::StopSSBGM(int Num) {
-	int Tmp = LoadSoundMemFromSoftSound(SoftSoundHandle);
-	StopSoundMem(Tmp);
+void SoundManager::PlayBGM(SoundID id) {
+    int idx = static_cast<int>(id);
+    if (idx < 0 || idx >= (int)mBGM.size()) return;
+    int h = mBGM[idx];
+    if (h == INVALID_HANDLE) return;
+
+    ChangeVolumeSoundMem(255 * mBGMVolume / 100, h);
+    PlaySoundMem(h, DX_PLAYTYPE_LOOP);
 }
 
-void SoundManager::DeleteBGM(int Num) {
-	DeleteSoundMem(BGM[Num]);
+void SoundManager::StopBGM(SoundID id) {
+    int idx = static_cast<int>(id);
+    if (idx < 0 || idx >= (int)mBGM.size()) return;
+    int h = mBGM[idx];
+    if (h == INVALID_HANDLE) return;
+
+    StopSoundMem(h);
 }
 
-void SoundManager::DeleteSSBGM(int Num) {
-	SoundManager::GetInstance().ChangeBGMVolume(Volume);
-	int Tmp = LoadSoundMemFromSoftSound(SoftSoundHandle);
-	DeleteSoundMem(Tmp);
+void SoundManager::DeleteBGM(SoundID id) {
+    int idx = static_cast<int>(id);
+    if (idx < 0 || idx >= (int)mBGM.size()) return;
+    safeDelete(mBGM[idx]);
 }
 
-void SoundManager::ChangeVolume(int V) {
-	for (int i = 0; i < SE.size(); i++) {
-		ChangeVolumeSoundMem(255 * V / 100, SE[i]);
-	}
+// ---------- SoftSound ベースのBGM ----------
+
+void SoundManager::SetSSBGM(SoundID id, int loopSamplePos, const std::string& file) {
+    ensureBGMSize(id);
+    int idx = static_cast<int>(id);
+
+    // 既存 BGM・SoftSound を安全に破棄
+    safeDelete(mBGM[idx]);
+    if (mSoftSoundHandle != INVALID_HANDLE) {
+        DeleteSoftSound(mSoftSoundHandle);
+        mSoftSoundHandle = INVALID_HANDLE;
+    }
+
+    mSoftSoundHandle = LoadSoftSound(file.c_str());
+    if (mSoftSoundHandle == INVALID_HANDLE) return;
+
+    mBGM[idx] = LoadSoundMemFromSoftSound(mSoftSoundHandle);
+    if (mBGM[idx] != INVALID_HANDLE) {
+        SetLoopPosSoundMem(loopSamplePos, mBGM[idx]);
+        ChangeVolumeSoundMem(255 * mBGMVolume / 100, mBGM[idx]);
+    }
 }
 
-void SoundManager::ChangeBGMVolume(int V) {
-	ChangeVolumeSoundMem(255 * V / 100, BGM[to_underlying(SoundID::BGM1)]);
+void SoundManager::PlaySSBGM(SoundID id) {
+    PlayBGM(id); // 中身が SoftSound 由来でもハンドルは mBGM に入ってるので同じでOK
 }
 
-void SoundManager::ConfBGMVolume() {
-	if (InputManager::GetInstance().ReturnKey(KEY_INPUT_LSHIFT) > 0 || InputManager::GetInstance().ReturnKey(KEY_INPUT_RSHIFT) > 0) {
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_SEMICOLON) > 0) {
-			VolumeCount++;
-			int tmp = 10;
-			if (VolumeCount > 50)tmp = 5;
-			if (VolumeCount % tmp == 1) {
-				Volume++;
-				DrawCount = 1;
-				if (Volume > 100)Volume = 100;
-				SoundManager::GetInstance().ChangeBGMVolume(Volume);
-			}
-		}
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_MINUS) > 0) {
-			VolumeCount++;
-			int tmp = 10;
-			if (VolumeCount > 50)tmp = 5;
-			if (VolumeCount % tmp == 1) {
-				Volume--;
-				DrawCount = 1;
-				if (Volume < 0)Volume = 0;
-				SoundManager::GetInstance().ChangeBGMVolume(Volume);
-			}
-		}
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_MINUS) == 0 && InputManager::GetInstance().ReturnKey(KEY_INPUT_SEMICOLON) == 0)VolumeCount = 0;
-	}
-	else {
-		VolumeCount = 0;
-	}
+void SoundManager::StopSSBGM(SoundID id) {
+    StopBGM(id);
 }
 
-void SoundManager::ConfVolume() {
-	if (InputManager::GetInstance().ReturnKey(KEY_INPUT_LCONTROL) > 0 || InputManager::GetInstance().ReturnKey(KEY_INPUT_RCONTROL) > 0) {
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_SEMICOLON) > 0) {
-			SEVolumeCount++;
-			int tmp = 10;
-			if (SEVolumeCount > 50)tmp = 5;
-			if (SEVolumeCount % tmp == 1) {
-				SEVolume++;
-				DrawCount = 1;
-				if (SEVolume > 100)SEVolume = 100;
-				SoundManager::GetInstance().ChangeVolume(SEVolume);
-			}
-		}
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_MINUS) > 0) {
-			SEVolumeCount++;
-			int tmp = 10;
-			if (SEVolumeCount > 50)tmp = 5;
-			if (SEVolumeCount % tmp == 1) {
-				SEVolume--;
-				DrawCount = 1;
-				if (SEVolume < 0)SEVolume = 0;
-				SoundManager::GetInstance().ChangeVolume(SEVolume);
-			}
-		}
-		if (InputManager::GetInstance().ReturnKey(KEY_INPUT_MINUS) == 0 && InputManager::GetInstance().ReturnKey(KEY_INPUT_SEMICOLON) == 0)SEVolumeCount = 0;
-	}
-	else {
-		SEVolumeCount = 0;
-	}
+void SoundManager::DeleteSSBGM(SoundID id) {
+    DeleteBGM(id);
+    if (mSoftSoundHandle != INVALID_HANDLE) {
+        DeleteSoftSound(mSoftSoundHandle);
+        mSoftSoundHandle = INVALID_HANDLE;
+    }
 }
 
-void SoundManager::Draw() {
-	if (DrawCount > 0)DrawCount++;
-	if (DrawCount > 100)DrawCount = 0;
-	if (DrawCount > 0) {
-		DrawString(4, 4, ("BGM : " + std::to_string(Volume)).c_str(), GetColor(255, 0, 0));
-		DrawString(4, 20, ("SE  : " + std::to_string(SEVolume)).c_str(), GetColor(255, 0, 0));
-	}
+// ---------- Volume ----------
+
+void SoundManager::SetSEVolume(int v) {
+    if (v < 0) v = 0;
+    else if (v > 100) v = 100;
+    mSEVolume = v;
+
+    for (auto h : mSE) {
+        if (h != INVALID_HANDLE) {
+            ChangeVolumeSoundMem(255 * mSEVolume / 100, h);
+        }
+    }
 }
 
-int SoundManager::GetSoftSoundHandle() {
-	return SoftSoundHandle;
-}
+void SoundManager::SetBGMVolume(int v) {
+    if (v < 0) v = 0;
+    else if (v > 100) v = 100;
+    mBGMVolume = v;
 
-int SoundManager::GetSSBGMHandle() {
-	return LoadSoundMemFromSoftSound(SoftSoundHandle);
-}
-
-int SoundManager::GetVolume() {
-	return Volume;
+    for (auto h : mBGM) {
+        if (h != INVALID_HANDLE) {
+            ChangeVolumeSoundMem(255 * mBGMVolume / 100, h);
+        }
+    }
 }
