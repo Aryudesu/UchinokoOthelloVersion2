@@ -13,5 +13,5 @@ public:
     void Update() override;
     void Draw() override;
     bool IsEnd() const override;
-    SceneID NextScene() override;
+    SceneID NextScene() const override;
 };

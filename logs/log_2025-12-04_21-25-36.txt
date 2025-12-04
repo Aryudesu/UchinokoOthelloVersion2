@@ -1,0 +1,1 @@
+[DEBUG] 2025-12-04 21:25:37.695 (C:\Users\suwak\source\repos\UchinokoOthelloVersion2\src\core\main.cpp:29) Mainloop started
