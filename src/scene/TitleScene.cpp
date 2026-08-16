@@ -1,4 +1,3 @@
-#pragma once
 #include "manager/InputManager.h"
 #include "scene/SceneBase.h"
 #include "scene/TitleScene.h"
@@ -18,13 +17,13 @@ void TitleScene::Update() {
     auto& input = InputManager::GetInstance();
 
     if (input.isPressed(KEY_INPUT_ESCAPE)) {
-        // ƒAƒvƒŠI—¹
+        // ã‚¢ãƒ—ãƒªçµ‚äº†
         RequestQuit();
         return;
     }
 
     if (input.isPressed(KEY_INPUT_RETURN)) {
-        // Game ‚Ö‘JˆÚ
+        // Gameã¸é·ç§»
         next_ = SceneID::Game;
         end_ = true;
         return;
