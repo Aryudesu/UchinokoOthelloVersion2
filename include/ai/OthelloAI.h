@@ -2,13 +2,25 @@
 
 #include "model/BitBoard.h"
 
+#include <atomic>
 #include <cstdint>
 #include <optional>
+#include <stop_token>
 #include <unordered_map>
 #include <vector>
 
 class OthelloAI {
 public:
+    struct SearchProgress {
+        std::atomic<std::uint64_t> searchedNodes{ 0 };
+        std::atomic<std::uint64_t> transpositionHits{ 0 };
+        std::atomic<int> completedDepth{ 0 };
+        std::atomic<int> targetDepth{ 0 };
+        std::atomic<bool> exactSearch{ false };
+
+        void reset(int target, bool exact) noexcept;
+    };
+
     struct Move {
         int row = -1;
         int col = -1;
@@ -31,7 +43,9 @@ public:
 
     [[nodiscard]] std::optional<Move> chooseMove(
         const BitBoard& board,
-        Disc disc
+        Disc disc,
+        std::stop_token stopToken = {},
+        SearchProgress* progress = nullptr
     ) const;
 
 private:
@@ -70,6 +84,8 @@ private:
     int exactEndgameEmpty_ = 14;
     mutable std::uint64_t searchedNodes_ = 0;
     mutable std::uint64_t transpositionHits_ = 0;
+    mutable std::stop_token stopToken_;
+    mutable SearchProgress* progress_ = nullptr;
     mutable std::unordered_map<
         PositionKey,
         TranspositionEntry,
@@ -109,6 +125,9 @@ private:
         const PositionKey& key,
         const TranspositionEntry& entry
     ) const;
+
+    void checkCancellation() const;
+    void publishProgress() const noexcept;
 
     [[nodiscard]] static Disc opponentOf(Disc disc) noexcept;
 };
