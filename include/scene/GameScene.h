@@ -1,15 +1,16 @@
 #pragma once
 #include "scene/SceneBase.h"
 #include "core/Ids.h"
+#include "model/BitBoard.h"
 
 class GameScene : public SceneBase {
-    bool    end_ = false;
+    bool end_ = false;
     SceneID next_ = SceneID::Game;
+    BitBoard board_;
 
-    // 盤面描画用パラメータ
-    static constexpr int BoardSize = 8;
-    static constexpr int CellSize = 32;   // 1マスのピクセルサイズ（好みで調整）
-    static constexpr int BoardLeft = 200;  // 左上位置
+    static constexpr int BoardSize = BitBoard::Size;
+    static constexpr int CellSize = 32;
+    static constexpr int BoardLeft = 200;
     static constexpr int BoardTop = 80;
 
 public:
