@@ -16,6 +16,10 @@ namespace {
     }
 }
 
+GameScene::~GameScene() {
+    cancelAiSearch();
+}
+
 void GameScene::Start() {
     end_ = false;
     next_ = SceneID::Game;
@@ -29,15 +33,20 @@ void GameScene::Start() {
     aiExactSearch_ = false;
     aiTranspositionHits_ = 0;
     aiIterations_ = 0;
+    phase_ = Phase::PlayerTurn;
+    aiFinished_.store(false, std::memory_order_relaxed);
+    pendingAiMove_.reset();
 }
 
 void GameScene::End() {
+    cancelAiSearch();
 }
 
 void GameScene::Update() {
     auto& input = InputManager::GetInstance();
 
     if (input.isPressed(KEY_INPUT_ESCAPE)) {
+        cancelAiSearch();
         next_ = SceneID::Title;
         end_ = true;
         return;
@@ -47,10 +56,15 @@ void GameScene::Update() {
     const bool clicked = mouseLeft && !mouseLeftDown_;
     mouseLeftDown_ = mouseLeft;
 
+    if (phase_ == Phase::AiThinking) {
+        if (aiFinished_.load(std::memory_order_acquire)) finishAiSearch();
+        return;
+    }
+
     if (gameOver_) return;
 
     if (turn_ == Disc::White) {
-        performAiMove();
+        startAiSearch();
         return;
     }
 
@@ -80,7 +94,12 @@ void GameScene::handleBoardClick() {
 }
 
 void GameScene::performAiMove() {
-    const auto move = ai_.chooseMove(board_, Disc::White);
+    std::optional<OthelloAI::Move> move;
+    {
+        std::lock_guard lock(aiResultMutex_);
+        move = std::move(pendingAiMove_);
+        pendingAiMove_.reset();
+    }
     if (!move.has_value()) {
         advanceTurn();
         return;
@@ -94,6 +113,52 @@ void GameScene::performAiMove() {
         aiIterations_ = move->completedIterations;
         advanceTurn();
     }
+}
+
+void GameScene::startAiSearch() {
+    if (phase_ == Phase::AiThinking) return;
+
+    cancelAiSearch();
+    const BitBoard boardSnapshot = board_;
+    aiProgress_.reset(0, false);
+    aiFinished_.store(false, std::memory_order_relaxed);
+    aiStartedAt_ = std::chrono::steady_clock::now();
+    phase_ = Phase::AiThinking;
+
+    aiThread_ = std::jthread(
+        [this, boardSnapshot](std::stop_token stopToken) {
+            auto result = ai_.chooseMove(
+                boardSnapshot, Disc::White, stopToken, &aiProgress_
+            );
+            if (!stopToken.stop_requested()) {
+                std::lock_guard lock(aiResultMutex_);
+                pendingAiMove_ = std::move(result);
+            }
+            aiFinished_.store(true, std::memory_order_release);
+        }
+    );
+}
+
+void GameScene::finishAiSearch() {
+    if (aiThread_.joinable()) aiThread_.join();
+    phase_ = Phase::ApplyingAiMove;
+    performAiMove();
+    if (!gameOver_) {
+        phase_ = turn_ == Disc::White
+            ? Phase::ApplyingAiMove
+            : Phase::PlayerTurn;
+        if (turn_ == Disc::White) startAiSearch();
+    }
+}
+
+void GameScene::cancelAiSearch() {
+    if (aiThread_.joinable()) {
+        aiThread_.request_stop();
+        aiThread_.join();
+    }
+    aiFinished_.store(false, std::memory_order_relaxed);
+    std::lock_guard lock(aiResultMutex_);
+    pendingAiMove_.reset();
 }
 
 void GameScene::advanceTurn() {
@@ -111,6 +176,7 @@ void GameScene::advanceTurn() {
     }
 
     gameOver_ = true;
+    phase_ = Phase::GameOver;
 }
 
 void GameScene::Draw() {
@@ -168,22 +234,42 @@ void GameScene::Draw() {
         } else {
             std::snprintf(status, sizeof(status), "Game Over: Draw");
         }
-    } else if (turn_ == Disc::White) {
-        std::snprintf(status, sizeof(status), "AI is thinking...");
+    } else if (phase_ == Phase::AiThinking) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - aiStartedAt_
+        ).count();
+        const int dots = static_cast<int>((elapsed / 300) % 4);
+        std::snprintf(status, sizeof(status), "AI is thinking%.*s", dots, "...");
     } else {
         std::snprintf(status, sizeof(status), "Your turn");
     }
 
-    char aiInfo[112];
+    char aiInfo[128];
+    const bool thinking = phase_ == Phase::AiThinking;
+    const int displayDepth = thinking
+        ? aiProgress_.completedDepth.load(std::memory_order_relaxed)
+        : aiSearchDepth_;
+    const int targetDepth = thinking
+        ? aiProgress_.targetDepth.load(std::memory_order_relaxed)
+        : aiSearchDepth_;
+    const auto displayNodes = thinking
+        ? aiProgress_.searchedNodes.load(std::memory_order_relaxed)
+        : aiSearchedNodes_;
+    const auto displayHits = thinking
+        ? aiProgress_.transpositionHits.load(std::memory_order_relaxed)
+        : aiTranspositionHits_;
+    const bool displayExact = thinking
+        ? aiProgress_.exactSearch.load(std::memory_order_relaxed)
+        : aiExactSearch_;
     std::snprintf(
         aiInfo,
         sizeof(aiInfo),
-        "AI depth: %d  Iter: %d  Nodes: %llu  TT: %llu%s",
-        aiSearchDepth_ > 0 ? aiSearchDepth_ : ai_.depth(),
-        aiIterations_,
-        static_cast<unsigned long long>(aiSearchedNodes_),
-        static_cast<unsigned long long>(aiTranspositionHits_),
-        aiExactSearch_ ? "  EXACT" : ""
+        "AI depth: %d/%d  Nodes: %llu  TT: %llu%s",
+        displayDepth,
+        targetDepth > 0 ? targetDepth : ai_.depth(),
+        static_cast<unsigned long long>(displayNodes),
+        static_cast<unsigned long long>(displayHits),
+        displayExact ? "  EXACT" : ""
     );
 
     DrawString(32, 32, "Othello vs AI", whiteColor);
