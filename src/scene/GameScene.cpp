@@ -24,6 +24,7 @@ void GameScene::Start() {
     passed_ = Disc::Empty;
     gameOver_ = false;
     mouseLeftDown_ = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
+    aiSearchedNodes_ = 0;
 }
 
 void GameScene::End() {
@@ -42,7 +43,14 @@ void GameScene::Update() {
     const bool clicked = mouseLeft && !mouseLeftDown_;
     mouseLeftDown_ = mouseLeft;
 
-    if (!gameOver_ && clicked) {
+    if (gameOver_) return;
+
+    if (turn_ == Disc::White) {
+        performAiMove();
+        return;
+    }
+
+    if (clicked) {
         handleBoardClick();
     }
 }
@@ -62,7 +70,20 @@ void GameScene::handleBoardClick() {
     const int col = (mouseX - BoardLeft) / CellSize;
     const int row = (mouseY - BoardTop) / CellSize;
 
-    if (board_.put(turn_, row, col)) {
+    if (board_.put(Disc::Black, row, col)) {
+        advanceTurn();
+    }
+}
+
+void GameScene::performAiMove() {
+    const auto move = ai_.chooseMove(board_, Disc::White);
+    if (!move.has_value()) {
+        advanceTurn();
+        return;
+    }
+
+    if (board_.put(Disc::White, move->row, move->col)) {
+        aiSearchedNodes_ = move->searchedNodes;
         advanceTurn();
     }
 }
@@ -103,7 +124,10 @@ void GameScene::Draw() {
         DrawLine(BoardLeft, y, boardRight, y, lineColor);
     }
 
-    const BitBoard::Bits legalMoves = gameOver_ ? 0 : board_.legalMoves(turn_);
+    const BitBoard::Bits legalMoves =
+        !gameOver_ && turn_ == Disc::Black
+        ? board_.legalMoves(Disc::Black)
+        : 0;
 
     for (int row = 0; row < BoardSize; ++row) {
         for (int col = 0; col < BoardSize; ++col) {
@@ -125,30 +149,42 @@ void GameScene::Draw() {
     const int whiteCount = board_.count(Disc::White);
 
     char score[64];
-    std::snprintf(score, sizeof(score), "Black: %d  White: %d", blackCount, whiteCount);
+    std::snprintf(score, sizeof(score), "You (Black): %d  AI (White): %d", blackCount, whiteCount);
 
     char status[64];
     if (gameOver_) {
         if (blackCount > whiteCount) {
-            std::snprintf(status, sizeof(status), "Game Over: Black wins");
+            std::snprintf(status, sizeof(status), "Game Over: You win");
         } else if (whiteCount > blackCount) {
-            std::snprintf(status, sizeof(status), "Game Over: White wins");
+            std::snprintf(status, sizeof(status), "Game Over: AI wins");
         } else {
             std::snprintf(status, sizeof(status), "Game Over: Draw");
         }
+    } else if (turn_ == Disc::White) {
+        std::snprintf(status, sizeof(status), "AI is thinking...");
     } else {
-        std::snprintf(status, sizeof(status), "Turn: %s", discName(turn_));
+        std::snprintf(status, sizeof(status), "Your turn");
     }
 
-    DrawString(32, 32, "Game Scene", whiteColor);
+    char aiInfo[64];
+    std::snprintf(
+        aiInfo,
+        sizeof(aiInfo),
+        "AI depth: %d  Last nodes: %llu",
+        ai_.depth(),
+        static_cast<unsigned long long>(aiSearchedNodes_)
+    );
+
+    DrawString(32, 32, "Othello vs AI", whiteColor);
     DrawString(32, 56, "Click a legal move / ESC : Back to Title", whiteColor);
     DrawString(32, 80, score, whiteColor);
     DrawString(32, 104, status, gameOver_ ? noticeColor : whiteColor);
+    DrawString(32, 128, aiInfo, whiteColor);
 
     if (passed_ != Disc::Empty) {
         char passMessage[64];
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
-        DrawString(32, 128, passMessage, noticeColor);
+        DrawString(32, 152, passMessage, noticeColor);
     }
 }
 
