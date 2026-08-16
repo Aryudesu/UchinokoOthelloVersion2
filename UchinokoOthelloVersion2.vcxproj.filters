@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\model\BitBoard.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\FramePacer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -47,6 +50,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\model\BitBoard.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="include\scene\TitleScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
