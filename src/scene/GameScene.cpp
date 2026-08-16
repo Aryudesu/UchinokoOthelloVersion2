@@ -27,6 +27,8 @@ void GameScene::Start() {
     aiSearchedNodes_ = 0;
     aiSearchDepth_ = 0;
     aiExactSearch_ = false;
+    aiTranspositionHits_ = 0;
+    aiIterations_ = 0;
 }
 
 void GameScene::End() {
@@ -88,6 +90,8 @@ void GameScene::performAiMove() {
         aiSearchedNodes_ = move->searchedNodes;
         aiSearchDepth_ = move->searchDepth;
         aiExactSearch_ = move->exactSearch;
+        aiTranspositionHits_ = move->transpositionHits;
+        aiIterations_ = move->completedIterations;
         advanceTurn();
     }
 }
@@ -170,13 +174,15 @@ void GameScene::Draw() {
         std::snprintf(status, sizeof(status), "Your turn");
     }
 
-    char aiInfo[64];
+    char aiInfo[112];
     std::snprintf(
         aiInfo,
         sizeof(aiInfo),
-        "AI depth: %d  Last nodes: %llu%s",
+        "AI depth: %d  Iter: %d  Nodes: %llu  TT: %llu%s",
         aiSearchDepth_ > 0 ? aiSearchDepth_ : ai_.depth(),
+        aiIterations_,
         static_cast<unsigned long long>(aiSearchedNodes_),
+        static_cast<unsigned long long>(aiTranspositionHits_),
         aiExactSearch_ ? "  EXACT" : ""
     );
 

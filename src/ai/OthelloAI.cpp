@@ -15,6 +15,14 @@ namespace {
          -25, -45,  -5,  -5,  -5,  -5, -45, -25,
          120, -25,  20,   5,   5,  20, -25, 120,
     };
+
+    std::uint64_t mixHash(std::uint64_t value) noexcept {
+        value ^= value >> 30;
+        value *= 0xbf58476d1ce4e5b9ULL;
+        value ^= value >> 27;
+        value *= 0x94d049bb133111ebULL;
+        return value ^ (value >> 31);
+    }
 }
 
 OthelloAI::OthelloAI(int depth) noexcept {
@@ -37,13 +45,40 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
         return std::nullopt;
     }
 
-    searchedNodes_ = 0;
-    auto moves = orderedMoves(board, disc);
-
     const int emptyCount = 64 - board.count(Disc::Black) - board.count(Disc::White);
     const bool exactSearch = emptyCount <= exactEndgameEmpty_;
     const int searchDepth = exactSearch ? emptyCount : depth_;
 
+    searchedNodes_ = 0;
+    transpositionHits_ = 0;
+    transpositionTable_.clear();
+    transpositionTable_.reserve(MaxTranspositionEntries);
+
+    Move bestMove;
+    int preferredMoveIndex = -1;
+    for (int iterationDepth = 1; iterationDepth <= searchDepth; ++iterationDepth) {
+        bestMove = searchRoot(
+            board, disc, iterationDepth, exactSearch, preferredMoveIndex
+        );
+        preferredMoveIndex = bestMove.row * BitBoard::Size + bestMove.col;
+        bestMove.completedIterations = iterationDepth;
+    }
+
+    bestMove.searchedNodes = searchedNodes_;
+    bestMove.searchDepth = searchDepth;
+    bestMove.exactSearch = exactSearch;
+    bestMove.transpositionHits = transpositionHits_;
+    return bestMove;
+}
+
+OthelloAI::Move OthelloAI::searchRoot(
+    const BitBoard& board,
+    Disc disc,
+    int depth,
+    bool exactSearch,
+    int preferredMoveIndex
+) const {
+    auto moves = orderedMoves(board, disc, preferredMoveIndex);
     Move bestMove;
     int alpha = -Infinity;
     const int beta = Infinity;
@@ -56,18 +91,18 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
         int score;
         if (firstMove) {
             score = -negaScout(
-                child, opponentOf(disc), searchDepth - 1,
+                child, opponentOf(disc), depth - 1,
                 -beta, -alpha, exactSearch
             );
             firstMove = false;
         } else {
             score = -negaScout(
-                child, opponentOf(disc), searchDepth - 1,
+                child, opponentOf(disc), depth - 1,
                 -alpha - 1, -alpha, exactSearch
             );
             if (alpha < score && score < beta) {
                 score = -negaScout(
-                    child, opponentOf(disc), searchDepth - 1,
+                    child, opponentOf(disc), depth - 1,
                     -beta, -alpha, exactSearch
                 );
             }
@@ -80,9 +115,6 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
         alpha = std::max(alpha, score);
     }
 
-    bestMove.searchedNodes = searchedNodes_;
-    bestMove.searchDepth = searchDepth;
-    bestMove.exactSearch = exactSearch;
     return bestMove;
 }
 
@@ -96,22 +128,56 @@ int OthelloAI::negaScout(
 ) const {
     ++searchedNodes_;
 
+    const int originalAlpha = alpha;
+    const int originalBeta = beta;
+    const PositionKey key{ board.black(), board.white(), turn };
+    int preferredMoveIndex = -1;
+
+    const auto found = transpositionTable_.find(key);
+    if (found != transpositionTable_.end()) {
+        preferredMoveIndex = found->second.bestMoveIndex;
+        if (found->second.depth >= depth) {
+            ++transpositionHits_;
+            if (found->second.bound == Bound::Exact) {
+                return found->second.score;
+            }
+            if (found->second.bound == Bound::Lower) {
+                alpha = std::max(alpha, found->second.score);
+            } else {
+                beta = std::min(beta, found->second.score);
+            }
+            if (alpha >= beta) return found->second.score;
+        }
+    }
+
     const Disc opponent = opponentOf(turn);
     const bool canMove = board.hasAnyMove(turn);
 
     if (!canMove) {
         if (!board.hasAnyMove(opponent)) {
-            return terminalScore(board, turn);
+            const int score = terminalScore(board, turn);
+            storeTransposition(key, { depth, score, -1, Bound::Exact });
+            return score;
         }
-        return -negaScout(board, opponent, depth, -beta, -alpha, exactSearch);
+        const int score = -negaScout(
+            board, opponent, depth, -beta, -alpha, exactSearch
+        );
+        Bound bound = Bound::Exact;
+        if (score <= originalAlpha) bound = Bound::Upper;
+        else if (score >= originalBeta) bound = Bound::Lower;
+        storeTransposition(key, { depth, score, -1, bound });
+        return score;
     }
 
     if (depth <= 0) {
-        return evaluate(board, turn);
+        const int score = evaluate(board, turn);
+        storeTransposition(key, { depth, score, -1, Bound::Exact });
+        return score;
     }
 
-    const auto moves = orderedMoves(board, turn);
+    const auto moves = orderedMoves(board, turn, preferredMoveIndex);
     bool firstMove = true;
+    int bestMoveIndex = -1;
     for (const Move& move : moves) {
         BitBoard child = board;
         if (!child.put(turn, move.row, move.col)) continue;
@@ -133,10 +199,17 @@ int OthelloAI::negaScout(
             }
         }
 
-        alpha = std::max(alpha, score);
+        if (score > alpha) {
+            alpha = score;
+            bestMoveIndex = move.row * BitBoard::Size + move.col;
+        }
         if (alpha >= beta) break;
     }
 
+    Bound bound = Bound::Exact;
+    if (alpha <= originalAlpha) bound = Bound::Upper;
+    else if (alpha >= originalBeta) bound = Bound::Lower;
+    storeTransposition(key, { depth, alpha, bestMoveIndex, bound });
     return alpha;
 }
 
@@ -184,7 +257,8 @@ int OthelloAI::terminalScore(
 
 std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
     const BitBoard& board,
-    Disc disc
+    Disc disc,
+    int preferredMoveIndex
 ) const {
     std::vector<Move> result;
     BitBoard::Bits moves = board.legalMoves(disc);
@@ -199,6 +273,8 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
             0,
             0,
             false,
+            0,
+            0,
         });
         BitBoard child = board;
         child.put(disc, index / BitBoard::Size, index % BitBoard::Size);
@@ -214,7 +290,43 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
             return lhs.score > rhs.score;
         }
     );
+    if (preferredMoveIndex >= 0) {
+        const auto preferred = std::find_if(
+            result.begin(), result.end(),
+            [preferredMoveIndex](const Move& move) {
+                return move.row * BitBoard::Size + move.col == preferredMoveIndex;
+            }
+        );
+        if (preferred != result.end()) {
+            std::rotate(result.begin(), preferred, preferred + 1);
+        }
+    }
     return result;
+}
+
+std::size_t OthelloAI::PositionKeyHash::operator()(
+    const PositionKey& key
+) const noexcept {
+    const std::uint64_t turnSalt =
+        key.turn == Disc::Black ? 0x9e3779b97f4a7c15ULL
+        : 0x243f6a8885a308d3ULL;
+    return static_cast<std::size_t>(
+        mixHash(key.black) ^ (mixHash(key.white) << 1) ^ turnSalt
+    );
+}
+
+void OthelloAI::storeTransposition(
+    const PositionKey& key,
+    const TranspositionEntry& entry
+) const {
+    const auto found = transpositionTable_.find(key);
+    if (found != transpositionTable_.end()) {
+        if (entry.depth >= found->second.depth) found->second = entry;
+        return;
+    }
+    if (transpositionTable_.size() < MaxTranspositionEntries) {
+        transpositionTable_.emplace(key, entry);
+    }
 }
 
 Disc OthelloAI::opponentOf(Disc disc) noexcept {
