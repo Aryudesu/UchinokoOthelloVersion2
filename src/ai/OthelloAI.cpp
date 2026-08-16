@@ -25,6 +25,10 @@ void OthelloAI::setDepth(int depth) noexcept {
     depth_ = std::clamp(depth, 1, 12);
 }
 
+void OthelloAI::setExactEndgameEmpty(int emptyCount) noexcept {
+    exactEndgameEmpty_ = std::clamp(emptyCount, 0, 20);
+}
+
 std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const BitBoard& board,
     Disc disc
@@ -36,21 +40,38 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     searchedNodes_ = 0;
     auto moves = orderedMoves(board, disc);
 
+    const int emptyCount = 64 - board.count(Disc::Black) - board.count(Disc::White);
+    const bool exactSearch = emptyCount <= exactEndgameEmpty_;
+    const int searchDepth = exactSearch ? emptyCount : depth_;
+
     Move bestMove;
     int alpha = -Infinity;
     const int beta = Infinity;
 
+    bool firstMove = true;
     for (const Move& move : moves) {
         BitBoard child = board;
         if (!child.put(disc, move.row, move.col)) continue;
 
-        const int score = -negamax(
-            child,
-            opponentOf(disc),
-            depth_ - 1,
-            -beta,
-            -alpha
-        );
+        int score;
+        if (firstMove) {
+            score = -negaScout(
+                child, opponentOf(disc), searchDepth - 1,
+                -beta, -alpha, exactSearch
+            );
+            firstMove = false;
+        } else {
+            score = -negaScout(
+                child, opponentOf(disc), searchDepth - 1,
+                -alpha - 1, -alpha, exactSearch
+            );
+            if (alpha < score && score < beta) {
+                score = -negaScout(
+                    child, opponentOf(disc), searchDepth - 1,
+                    -beta, -alpha, exactSearch
+                );
+            }
+        }
 
         if (score > bestMove.score || bestMove.row < 0) {
             bestMove = move;
@@ -60,15 +81,18 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     }
 
     bestMove.searchedNodes = searchedNodes_;
+    bestMove.searchDepth = searchDepth;
+    bestMove.exactSearch = exactSearch;
     return bestMove;
 }
 
-int OthelloAI::negamax(
+int OthelloAI::negaScout(
     const BitBoard& board,
     Disc turn,
     int depth,
     int alpha,
-    int beta
+    int beta,
+    bool exactSearch
 ) const {
     ++searchedNodes_;
 
@@ -79,34 +103,41 @@ int OthelloAI::negamax(
         if (!board.hasAnyMove(opponent)) {
             return terminalScore(board, turn);
         }
-        return -negamax(board, opponent, depth, -beta, -alpha);
+        return -negaScout(board, opponent, depth, -beta, -alpha, exactSearch);
     }
 
     if (depth <= 0) {
         return evaluate(board, turn);
     }
 
-    int best = -Infinity;
     const auto moves = orderedMoves(board, turn);
-
+    bool firstMove = true;
     for (const Move& move : moves) {
         BitBoard child = board;
         if (!child.put(turn, move.row, move.col)) continue;
 
-        const int score = -negamax(
-            child,
-            opponent,
-            depth - 1,
-            -beta,
-            -alpha
-        );
+        int score;
+        if (firstMove) {
+            score = -negaScout(
+                child, opponent, depth - 1, -beta, -alpha, exactSearch
+            );
+            firstMove = false;
+        } else {
+            score = -negaScout(
+                child, opponent, depth - 1, -alpha - 1, -alpha, exactSearch
+            );
+            if (alpha < score && score < beta) {
+                score = -negaScout(
+                    child, opponent, depth - 1, -beta, -alpha, exactSearch
+                );
+            }
+        }
 
-        best = std::max(best, score);
         alpha = std::max(alpha, score);
         if (alpha >= beta) break;
     }
 
-    return best;
+    return alpha;
 }
 
 int OthelloAI::evaluate(const BitBoard& board, Disc perspective) const {
@@ -164,9 +195,15 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
         result.push_back({
             index / BitBoard::Size,
             index % BitBoard::Size,
-            PositionWeights[index],
             0,
+            0,
+            0,
+            false,
         });
+        BitBoard child = board;
+        child.put(disc, index / BitBoard::Size, index % BitBoard::Size);
+        result.back().score = PositionWeights[index] * 100
+            - std::popcount(child.legalMoves(opponentOf(disc))) * 10;
         moves &= moves - 1;
     }
 
