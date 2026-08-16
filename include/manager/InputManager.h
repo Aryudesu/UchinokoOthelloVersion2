@@ -5,22 +5,25 @@
 
 constexpr int KEY_NUM = 256;
 
-// ƒL[“ü—ÍŠÇ—
+// ã‚­ãƒ¼å…¥åŠ›ç®¡ç†
 class InputManager {
 private:
-    std::array<uint8_t, KEY_NUM> tmp_{};     // GetHitKeyStateAll‚Ì¶”z—ñ
-    std::array<uint32_t, KEY_NUM> hold_{};   // ‰Ÿ‰ºŒp‘±ƒtƒŒ[ƒ€”
+    std::array<uint8_t, KEY_NUM> tmp_{};     // ç¾åœ¨ã®ã‚­ãƒ¼å…¥åŠ›çŠ¶æ…‹
+    std::array<uint8_t, KEY_NUM> prev_{};    // å‰ãƒ•ãƒ¬ãƒ¼ãƒ ã®ã‚­ãƒ¼å…¥åŠ›çŠ¶æ…‹
+    std::array<uint32_t, KEY_NUM> hold_{};   // æŠ¼ä¸‹ç¶™ç¶šãƒ•ãƒ¬ãƒ¼ãƒ æ•°
 public:
-	// ƒVƒ“ƒOƒ‹ƒgƒ“ƒCƒ“ƒXƒ^ƒ“ƒXæ“¾
+    // ã‚·ãƒ³ã‚°ãƒ«ãƒˆãƒ³ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹å–å¾—
     static InputManager& GetInstance() {
         static InputManager inst;
         return inst;
-	}
+    }
 
-    // –ˆƒtƒŒ[ƒ€æ“ª‚ÅŒÄ‚Ô
+    // æ¯ãƒ•ãƒ¬ãƒ¼ãƒ å…ˆé ­ã§å‘¼ã¶
     int Update() {
         char raw[KEY_NUM];
         GetHitKeyStateAll(raw);
+        prev_ = tmp_;
+
         for (int i = 0; i < KEY_NUM; ++i) {
             tmp_[i] = (raw[i] != 0) ? 1 : 0;
             if (tmp_[i]) {
@@ -32,7 +35,7 @@ public:
         return 0;
     }
 
-    // w’èƒL[‚ÌŒp‘±ƒtƒŒ[ƒ€”i0=‰Ÿ‚µ‚Ä‚È‚¢, 1~j
+    // æŒ‡å®šã‚­ãƒ¼ã®ç¶™ç¶šãƒ•ãƒ¬ãƒ¼ãƒ æ•°ï¼ˆ0=æŠ¼ã—ã¦ãªã„, 1~ï¼‰
     int ReturnKey(int key) const {
         if (key < 0 || key >= KEY_NUM) return 0;
         return static_cast<int>(hold_[key]);
@@ -40,11 +43,12 @@ public:
 
     bool isDown(int key) const { return (key >= 0 && key < KEY_NUM) ? tmp_[key] != 0 : false; }
     bool isPressed(int key) const { return (key >= 0 && key < KEY_NUM) ? (hold_[key] == 1) : false; }
-    bool isReleased(int key) const { return (key >= 0 && key < KEY_NUM) ? (!tmp_[key] && hold_[key] == 0) : false; }
+    bool isReleased(int key) const {
+        return (key >= 0 && key < KEY_NUM) ? (prev_[key] != 0 && tmp_[key] == 0) : false;
+    }
 
-	// ƒVƒ“ƒOƒ‹ƒgƒ“æ“¾
 private:
     InputManager() = default;
     InputManager(const InputManager&) = delete;
-	InputManager& operator=(const InputManager&) = delete;
+    InputManager& operator=(const InputManager&) = delete;
 };
