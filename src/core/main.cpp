@@ -15,6 +15,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ 
 
 
 	// DXƒ‰ƒCƒuƒ‰ƒŠ‰Šú‰»
+    SetOutApplicationLogValidFlag(FALSE);
     ChangeWindowMode(TRUE);
     if (DxLib_Init() == -1) {
         MessageBox(NULL, "Dxlib Init Failed", "Error", MB_OK | MB_ICONERROR);
