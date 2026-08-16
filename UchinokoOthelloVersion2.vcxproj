@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\core\FramePacer.cpp" />
+    <ClCompile Include="src\model\BitBoard.cpp" />
     <ClCompile Include="src\scene\GameScene.cpp" />
     <ClCompile Include="src\manager\ImageManager.cpp" />
     <ClCompile Include="src\util\DebugOverlay.cpp" />
@@ -32,6 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\util\debug.h" />
+    <ClInclude Include="include\model\BitBoard.h" />
     <ClInclude Include="include\core\FramePacer.h" />
     <ClInclude Include="include\scene\GameScene.h" />
     <ClInclude Include="include\core\Ids.h" />
