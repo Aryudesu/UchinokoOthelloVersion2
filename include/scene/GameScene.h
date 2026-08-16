@@ -2,15 +2,20 @@
 #include "scene/SceneBase.h"
 #include "core/Ids.h"
 #include "model/BitBoard.h"
+#include "ai/OthelloAI.h"
+
+#include <cstdint>
 
 class GameScene : public SceneBase {
     bool end_ = false;
     SceneID next_ = SceneID::Game;
     BitBoard board_;
+    OthelloAI ai_{ 5 };
     Disc turn_ = Disc::Black;
     Disc passed_ = Disc::Empty;
     bool gameOver_ = false;
     bool mouseLeftDown_ = false;
+    std::uint64_t aiSearchedNodes_ = 0;
 
     static constexpr int BoardSize = BitBoard::Size;
     static constexpr int CellSize = 32;
@@ -18,6 +23,7 @@ class GameScene : public SceneBase {
     static constexpr int BoardTop = 80;
 
     void handleBoardClick();
+    void performAiMove();
     void advanceTurn();
 
 public:
