@@ -36,7 +36,7 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     searchedNodes_ = 0;
     auto moves = orderedMoves(board, disc);
 
-    Move bestMove = moves.front();
+    Move bestMove;
     int alpha = -Infinity;
     const int beta = Infinity;
 
