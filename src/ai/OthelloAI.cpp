@@ -5,6 +5,8 @@
 #include <bit>
 
 namespace {
+    struct SearchCancelled {};
+
     constexpr std::array<int, 64> PositionWeights = {
          120, -25,  20,   5,   5,  20, -25, 120,
          -25, -45,  -5,  -5,  -5,  -5, -45, -25,
@@ -25,6 +27,14 @@ namespace {
     }
 }
 
+void OthelloAI::SearchProgress::reset(int target, bool exact) noexcept {
+    searchedNodes.store(0, std::memory_order_relaxed);
+    transpositionHits.store(0, std::memory_order_relaxed);
+    completedDepth.store(0, std::memory_order_relaxed);
+    targetDepth.store(target, std::memory_order_relaxed);
+    exactSearch.store(exact, std::memory_order_relaxed);
+}
+
 OthelloAI::OthelloAI(int depth) noexcept {
     setDepth(depth);
 }
@@ -39,7 +49,9 @@ void OthelloAI::setExactEndgameEmpty(int emptyCount) noexcept {
 
 std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const BitBoard& board,
-    Disc disc
+    Disc disc,
+    std::stop_token stopToken,
+    SearchProgress* progress
 ) const {
     if (disc == Disc::Empty || !board.hasAnyMove(disc)) {
         return std::nullopt;
@@ -49,25 +61,44 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const bool exactSearch = emptyCount <= exactEndgameEmpty_;
     const int searchDepth = exactSearch ? emptyCount : depth_;
 
+    stopToken_ = stopToken;
+    progress_ = progress;
+    if (progress_) progress_->reset(searchDepth, exactSearch);
+
     searchedNodes_ = 0;
     transpositionHits_ = 0;
     transpositionTable_.clear();
     transpositionTable_.reserve(MaxTranspositionEntries);
 
     Move bestMove;
-    int preferredMoveIndex = -1;
-    for (int iterationDepth = 1; iterationDepth <= searchDepth; ++iterationDepth) {
-        bestMove = searchRoot(
-            board, disc, iterationDepth, exactSearch, preferredMoveIndex
-        );
-        preferredMoveIndex = bestMove.row * BitBoard::Size + bestMove.col;
-        bestMove.completedIterations = iterationDepth;
+    try {
+        checkCancellation();
+        int preferredMoveIndex = -1;
+        for (int iterationDepth = 1; iterationDepth <= searchDepth; ++iterationDepth) {
+            bestMove = searchRoot(
+                board, disc, iterationDepth, exactSearch, preferredMoveIndex
+            );
+            preferredMoveIndex = bestMove.row * BitBoard::Size + bestMove.col;
+            bestMove.completedIterations = iterationDepth;
+            if (progress_) {
+                progress_->completedDepth.store(
+                    iterationDepth, std::memory_order_relaxed
+                );
+            }
+            publishProgress();
+        }
+    } catch (const SearchCancelled&) {
+        publishProgress();
+        progress_ = nullptr;
+        return std::nullopt;
     }
 
     bestMove.searchedNodes = searchedNodes_;
     bestMove.searchDepth = searchDepth;
     bestMove.exactSearch = exactSearch;
     bestMove.transpositionHits = transpositionHits_;
+    publishProgress();
+    progress_ = nullptr;
     return bestMove;
 }
 
@@ -127,6 +158,10 @@ int OthelloAI::negaScout(
     bool exactSearch
 ) const {
     ++searchedNodes_;
+    if ((searchedNodes_ & 0x0fffULL) == 0) {
+        checkCancellation();
+        publishProgress();
+    }
 
     const int originalAlpha = alpha;
     const int originalBeta = beta;
@@ -327,6 +362,18 @@ void OthelloAI::storeTransposition(
     if (transpositionTable_.size() < MaxTranspositionEntries) {
         transpositionTable_.emplace(key, entry);
     }
+}
+
+void OthelloAI::checkCancellation() const {
+    if (stopToken_.stop_requested()) throw SearchCancelled{};
+}
+
+void OthelloAI::publishProgress() const noexcept {
+    if (!progress_) return;
+    progress_->searchedNodes.store(searchedNodes_, std::memory_order_relaxed);
+    progress_->transpositionHits.store(
+        transpositionHits_, std::memory_order_relaxed
+    );
 }
 
 Disc OthelloAI::opponentOf(Disc disc) noexcept {
