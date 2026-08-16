@@ -25,6 +25,8 @@ void GameScene::Start() {
     gameOver_ = false;
     mouseLeftDown_ = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
     aiSearchedNodes_ = 0;
+    aiSearchDepth_ = 0;
+    aiExactSearch_ = false;
 }
 
 void GameScene::End() {
@@ -84,6 +86,8 @@ void GameScene::performAiMove() {
 
     if (board_.put(Disc::White, move->row, move->col)) {
         aiSearchedNodes_ = move->searchedNodes;
+        aiSearchDepth_ = move->searchDepth;
+        aiExactSearch_ = move->exactSearch;
         advanceTurn();
     }
 }
@@ -170,9 +174,10 @@ void GameScene::Draw() {
     std::snprintf(
         aiInfo,
         sizeof(aiInfo),
-        "AI depth: %d  Last nodes: %llu",
-        ai_.depth(),
-        static_cast<unsigned long long>(aiSearchedNodes_)
+        "AI depth: %d  Last nodes: %llu%s",
+        aiSearchDepth_ > 0 ? aiSearchDepth_ : ai_.depth(),
+        static_cast<unsigned long long>(aiSearchedNodes_),
+        aiExactSearch_ ? "  EXACT" : ""
     );
 
     DrawString(32, 32, "Othello vs AI", whiteColor);

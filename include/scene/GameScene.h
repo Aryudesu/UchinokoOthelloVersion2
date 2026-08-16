@@ -16,6 +16,8 @@ class GameScene : public SceneBase {
     bool gameOver_ = false;
     bool mouseLeftDown_ = false;
     std::uint64_t aiSearchedNodes_ = 0;
+    int aiSearchDepth_ = 0;
+    bool aiExactSearch_ = false;
 
     static constexpr int BoardSize = BitBoard::Size;
     static constexpr int CellSize = 32;
