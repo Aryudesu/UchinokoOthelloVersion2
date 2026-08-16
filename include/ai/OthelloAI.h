@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 class OthelloAI {
@@ -15,6 +16,8 @@ public:
         std::uint64_t searchedNodes = 0;
         int searchDepth = 0;
         bool exactSearch = false;
+        std::uint64_t transpositionHits = 0;
+        int completedIterations = 0;
     };
 
     explicit OthelloAI(int depth = 5) noexcept;
@@ -34,10 +37,52 @@ public:
 private:
     static constexpr int Infinity = 2'000'000;
     static constexpr int WinScore = 1'000'000;
+    static constexpr std::size_t MaxTranspositionEntries = 500'000;
+
+    enum class Bound : std::uint8_t {
+        Exact,
+        Lower,
+        Upper,
+    };
+
+    struct PositionKey {
+        BitBoard::Bits black = 0;
+        BitBoard::Bits white = 0;
+        Disc turn = Disc::Empty;
+
+        bool operator==(const PositionKey&) const noexcept = default;
+    };
+
+    struct PositionKeyHash {
+        [[nodiscard]] std::size_t operator()(
+            const PositionKey& key
+        ) const noexcept;
+    };
+
+    struct TranspositionEntry {
+        int depth = -1;
+        int score = 0;
+        int bestMoveIndex = -1;
+        Bound bound = Bound::Exact;
+    };
 
     int depth_ = 5;
     int exactEndgameEmpty_ = 14;
     mutable std::uint64_t searchedNodes_ = 0;
+    mutable std::uint64_t transpositionHits_ = 0;
+    mutable std::unordered_map<
+        PositionKey,
+        TranspositionEntry,
+        PositionKeyHash
+    > transpositionTable_;
+
+    [[nodiscard]] Move searchRoot(
+        const BitBoard& board,
+        Disc disc,
+        int depth,
+        bool exactSearch,
+        int preferredMoveIndex
+    ) const;
 
     [[nodiscard]] int negaScout(
         const BitBoard& board,
@@ -56,7 +101,13 @@ private:
 
     [[nodiscard]] std::vector<Move> orderedMoves(
         const BitBoard& board,
-        Disc disc
+        Disc disc,
+        int preferredMoveIndex = -1
+    ) const;
+
+    void storeTransposition(
+        const PositionKey& key,
+        const TranspositionEntry& entry
     ) const;
 
     [[nodiscard]] static Disc opponentOf(Disc disc) noexcept;
