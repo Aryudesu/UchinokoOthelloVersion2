@@ -8,7 +8,7 @@ class SceneManager {
     std::unique_ptr<SceneBase> cur_;
     bool quit_ = false;
 
-    // ƒV[ƒ“Ø‚è‘Ö‚¦ê—p‚Ì“à•”ŠÖ”
+    // ã‚·ãƒ¼ãƒ³åˆ‡ã‚Šæ›¿ãˆå°‚ç”¨ã®å†…éƒ¨é–¢æ•°
     void changeScene(SceneID next) {
         if (cur_) {
             cur_->End();
@@ -20,7 +20,7 @@ class SceneManager {
             cur_->Start();
         }
         else {
-            // ŽŸ‚ÌƒV[ƒ“‚ªì‚ê‚È‚©‚Á‚½‚çI—¹
+            // æ¬¡ã®ã‚·ãƒ¼ãƒ³ãŒä½œã‚Œãªã‹ã£ãŸã‚‰çµ‚äº†
             quit_ = true;
         }
     }
@@ -39,12 +39,19 @@ public:
 
     bool running() const { return !quit_; }
 
-    // --- XVƒtƒF[ƒY ---
+    // --- æ›´æ–°ãƒ•ã‚§ãƒ¼ã‚º ---
     void update() {
         if (quit_) return;
         if (!cur_) { quit_ = true; return; }
 
         cur_->Update();
+
+        if (cur_->WantsQuit()) {
+            cur_->End();
+            cur_.reset();
+            quit_ = true;
+            return;
+        }
 
         if (cur_->IsEnd()) {
             SceneID next = cur_->NextScene();
@@ -52,7 +59,7 @@ public:
         }
     }
 
-    // --- •`‰æƒtƒF[ƒY ---
+    // --- æç”»ãƒ•ã‚§ãƒ¼ã‚º ---
     void draw() const {
         if (quit_) return;
         if (!cur_) return;
