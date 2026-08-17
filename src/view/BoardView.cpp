@@ -33,7 +33,7 @@ void BoardView::Start() {
         "data/img/board.bmp"
     );
 
-    images.SetTrans(0, 0, 0);
+    images.SetTrans(163, 73, 164);
     images.LoadDiv(
         ImageID::Frame,
         SheetFrameSize,
