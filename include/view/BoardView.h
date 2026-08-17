@@ -42,6 +42,7 @@ private:
     static constexpr int StoneLastMove = 10;
 
     static constexpr int BoardFrameCount = 12;
+    static constexpr int BoardFrameDurationMs = 270;
     static constexpr int FlipFrameCount = 3;
     static constexpr int FlipFrameDurationMs = 80;
 
