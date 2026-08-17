@@ -23,6 +23,7 @@
     <ClCompile Include="src\ai\OthelloAI.cpp" />
     <ClCompile Include="src\model\BitBoard.cpp" />
     <ClCompile Include="src\scene\GameScene.cpp" />
+    <ClCompile Include="src\view\BoardView.cpp" />
     <ClCompile Include="src\manager\ImageManager.cpp" />
     <ClCompile Include="src\util\DebugOverlay.cpp" />
     <ClCompile Include="src\util\Dialog.cpp" />
@@ -38,6 +39,8 @@
     <ClInclude Include="include\model\BitBoard.h" />
     <ClInclude Include="include\core\FramePacer.h" />
     <ClInclude Include="include\scene\GameScene.h" />
+    <ClInclude Include="include\animation\SpriteAnimator.h" />
+    <ClInclude Include="include\view\BoardView.h" />
     <ClInclude Include="include\core\Ids.h" />
     <ClInclude Include="include\manager\ImageManager.h" />
     <ClInclude Include="include\manager\InputManager.h" />

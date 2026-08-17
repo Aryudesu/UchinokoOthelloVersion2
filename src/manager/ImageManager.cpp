@@ -1,122 +1,179 @@
 #include "manager/ImageManager.h"
+
 #include "DxLib.h"
+
 #include <cassert>
+#include <utility>
+#include <vector>
 
 namespace {
-    constexpr int INVALID_HANDLE = -1;
-}
-
-ImageManager::ImageManager() {
-    // enum の数が確定しているなら reserve しておくのもアリ
-    imgs_.resize(static_cast<int>(ImageID::Item) + 1); // 仮：最後のIDに合わせる
+    constexpr int InvalidHandle = -1;
+    constexpr int DefaultSheetFrameSize = 32;
 }
 
 ImageManager::~ImageManager() {
     DeleteAll();
 }
 
-void ImageManager::safeDelete(Handle& h) {
-    if (h != INVALID_HANDLE) {
-        DeleteGraph(h);
-        h = INVALID_HANDLE;
+std::size_t ImageManager::indexOf(ImageID id) noexcept {
+    const auto index = static_cast<std::size_t>(id);
+    assert(index < SlotCount);
+    return index;
+}
+
+ImageManager::Slot& ImageManager::getSlot(ImageID id) noexcept {
+    return images_[indexOf(id)];
+}
+
+const ImageManager::Slot& ImageManager::getSlot(ImageID id) const noexcept {
+    return images_[indexOf(id)];
+}
+
+void ImageManager::clearSlot(Slot& slot) noexcept {
+    for (auto& image : slot) {
+        if (image.handle != InvalidHandle) {
+            DeleteGraph(image.handle);
+        }
     }
+    slot.clear();
 }
 
-std::vector<ImageManager::Handle>& ImageManager::getSlot(ImageID id) {
-    auto idx = static_cast<int>(id);
-    if (idx < 0) idx = 0;
-    if (idx >= static_cast<int>(imgs_.size())) {
-        imgs_.resize(idx + 1);
-    }
-    return imgs_[idx];
-}
-
-const std::vector<ImageManager::Handle>& ImageManager::getSlot(ImageID id) const {
-    auto idx = static_cast<int>(id);
-    assert(idx >= 0 && idx < static_cast<int>(imgs_.size()));
-    return imgs_[idx];
-}
-
-// 透過色設定
 void ImageManager::SetTrans(int r, int g, int b) {
     SetTransColor(r, g, b);
 }
 
-// 単一画像読み込み
 void ImageManager::Load(ImageID id, const std::string& filename) {
     auto& slot = getSlot(id);
-    // 既存があれば削除
-    for (auto& h : slot) safeDelete(h);
-    slot.clear();
+    clearSlot(slot);
 
-    slot.resize(1, INVALID_HANDLE);
-    slot[0] = LoadGraph(filename.c_str());
+    const Handle handle = LoadGraph(filename.c_str());
+    if (handle == InvalidHandle) return;
+
+    int width = 0;
+    int height = 0;
+    if (GetGraphSize(handle, &width, &height) == -1) {
+        DeleteGraph(handle);
+        return;
+    }
+
+    slot.push_back({ handle, width, height });
 }
 
-// 分割画像読み込み
-void ImageManager::LoadDiv(ImageID id, int sizex, int sizey,
-    int cutX, int cutY,
-    const std::string& filename) {
+void ImageManager::LoadDiv(
+    ImageID id,
+    int sizeX,
+    int sizeY,
+    int cutX,
+    int cutY,
+    const std::string& filename
+) {
     auto& slot = getSlot(id);
-    for (auto& h : slot) safeDelete(h);
-    slot.clear();
+    clearSlot(slot);
 
-    const int num = cutX * cutY;
-    slot.resize(num, INVALID_HANDLE);
-    LoadDivGraph(filename.c_str(), num, cutX, cutY, sizex, sizey, slot.data());
+    if (sizeX <= 0 || sizeY <= 0 || cutX <= 0 || cutY <= 0) return;
+
+    const int count = cutX * cutY;
+    std::vector<Handle> handles(
+        static_cast<std::size_t>(count),
+        InvalidHandle
+    );
+
+    if (
+        LoadDivGraph(
+            filename.c_str(),
+            count,
+            cutX,
+            cutY,
+            sizeX,
+            sizeY,
+            handles.data()
+        ) == -1
+    ) {
+        for (Handle handle : handles) {
+            if (handle != InvalidHandle) DeleteGraph(handle);
+        }
+        return;
+    }
+
+    slot.reserve(static_cast<std::size_t>(count));
+    for (Handle handle : handles) {
+        slot.push_back({ handle, sizeX, sizeY });
+    }
 }
 
-// シート読み込み（32x32固定）
-void ImageManager::LoadSheet(ImageID id, int cutX, int cutY, const std::string& filename) {
-    LoadDiv(id, 32, 32, cutX, cutY, filename);
+void ImageManager::LoadSheet(
+    ImageID id,
+    int cutX,
+    int cutY,
+    const std::string& filename
+) {
+    LoadDiv(
+        id,
+        DefaultSheetFrameSize,
+        DefaultSheetFrameSize,
+        cutX,
+        cutY,
+        filename
+    );
 }
 
-// サイズ取得（num指定）
-void ImageManager::Size(ImageID id, int num, int& width, int& height) const {
+void ImageManager::Size(
+    ImageID id,
+    int num,
+    int& width,
+    int& height
+) const {
+    width = 0;
+    height = 0;
+
     const auto& slot = getSlot(id);
-    assert(num >= 0 && num < static_cast<int>(slot.size()));
-    int w = 0, h = 0;
-    GetGraphSize(slot[num], &w, &h);
-    width = w;
-    height = h;
+    if (num < 0 || static_cast<std::size_t>(num) >= slot.size()) return;
+
+    const auto& image = slot[static_cast<std::size_t>(num)];
+    width = image.width;
+    height = image.height;
 }
 
-// 最初の画像のサイズ
 void ImageManager::Size(ImageID id, int& width, int& height) const {
     Size(id, 0, width, height);
 }
 
-// 描画
-void ImageManager::Draw(float x, float y,
-    ImageID id, int num,
-    bool transFlag, bool turnY) const {
+void ImageManager::Draw(
+    float x,
+    float y,
+    ImageID id,
+    int num,
+    bool transFlag,
+    bool turnY
+) const {
     const auto& slot = getSlot(id);
-    if (num < 0 || num >= static_cast<int>(slot.size())) return; // 安全側
-    int h = slot[num];
-    if (h == INVALID_HANDLE) return;
+    if (num < 0 || static_cast<std::size_t>(num) >= slot.size()) return;
 
-    // 必要なら Rota じゃなく普通の DrawGraph でもOK（用途で選んで）
-    DrawGraphF(x, y, h, transFlag?TRUE:FALSE);
-    // もし上下反転や回転を使いたいなら DrawRotaGraph2F などに差し替え
+    const auto& image = slot[static_cast<std::size_t>(num)];
+    if (image.handle == InvalidHandle) return;
+
+    const int useTransparency = transFlag ? TRUE : FALSE;
+    if (turnY) {
+        DrawExtendGraphF(
+            x,
+            y + static_cast<float>(image.height),
+            x + static_cast<float>(image.width),
+            y,
+            image.handle,
+            useTransparency
+        );
+        return;
+    }
+
+    DrawGraphF(x, y, image.handle, useTransparency);
 }
 
-// IDのオブジェクトの画像破棄
 void ImageManager::Destroy(ImageID id) {
-    auto& slot = getSlot(id);
-    for (auto& h : slot) {
-        safeDelete(h);
-    }
-    slot.clear();
+    clearSlot(getSlot(id));
 }
 
-// 全部破棄
 void ImageManager::DeleteAll() {
-    for (auto& slot : imgs_) {
-        for (auto& h : slot) {
-            safeDelete(h);
-        }
-        slot.clear();
+    for (auto& slot : images_) {
+        clearSlot(slot);
     }
-    // 必要ならサイズを維持してもいいし、クリアしてもいい
-    // imgs_.clear();
 }

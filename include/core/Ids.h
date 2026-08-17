@@ -3,8 +3,12 @@
 
 enum class ImageID : int {
     MainChara = 0,
-    Enemy = 1,
-    Item = 2,
+    Enemy,
+    Item,
+    Stone,
+    Board,
+    Frame,
+    Count,
 };
 
 enum class SoundID : int {

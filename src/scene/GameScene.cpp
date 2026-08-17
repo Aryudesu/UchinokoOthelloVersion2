@@ -24,6 +24,8 @@ void GameScene::Start() {
     end_ = false;
     next_ = SceneID::Game;
     board_.reset();
+    boardView_.Start();
+    boardView_.Reset(board_);
     turn_ = Disc::Black;
     passed_ = Disc::Empty;
     gameOver_ = false;
@@ -40,10 +42,12 @@ void GameScene::Start() {
 
 void GameScene::End() {
     cancelAiSearch();
+    boardView_.End();
 }
 
 void GameScene::Update() {
     auto& input = InputManager::GetInstance();
+    boardView_.Update();
 
     if (input.isPressed(KEY_INPUT_ESCAPE)) {
         cancelAiSearch();
@@ -60,6 +64,10 @@ void GameScene::Update() {
         if (aiFinished_.load(std::memory_order_acquire)) finishAiSearch();
         return;
     }
+
+    // A flip is part of applying the previous move. Do not accept another move
+    // or start the AI until all three transition frames have been displayed.
+    if (boardView_.IsAnimating()) return;
 
     if (gameOver_) return;
 
@@ -78,17 +86,13 @@ void GameScene::handleBoardClick() {
     int mouseY = 0;
     GetMousePoint(&mouseX, &mouseY);
 
-    const int boardRight = BoardLeft + CellSize * BoardSize;
-    const int boardBottom = BoardTop + CellSize * BoardSize;
-    if (mouseX < BoardLeft || boardRight <= mouseX ||
-        mouseY < BoardTop || boardBottom <= mouseY) {
-        return;
-    }
+    int row = 0;
+    int col = 0;
+    if (!boardView_.HitTest(mouseX, mouseY, row, col)) return;
 
-    const int col = (mouseX - BoardLeft) / CellSize;
-    const int row = (mouseY - BoardTop) / CellSize;
-
+    const BitBoard before = board_;
     if (board_.put(Disc::Black, row, col)) {
+        boardView_.BeginMove(before, board_, Disc::Black, row, col);
         advanceTurn();
     }
 }
@@ -105,7 +109,15 @@ void GameScene::performAiMove() {
         return;
     }
 
+    const BitBoard before = board_;
     if (board_.put(Disc::White, move->row, move->col)) {
+        boardView_.BeginMove(
+            before,
+            board_,
+            Disc::White,
+            move->row,
+            move->col
+        );
         aiSearchedNodes_ = move->searchedNodes;
         aiSearchDepth_ = move->searchDepth;
         aiExactSearch_ = move->exactSearch;
@@ -147,7 +159,6 @@ void GameScene::finishAiSearch() {
         phase_ = turn_ == Disc::White
             ? Phase::ApplyingAiMove
             : Phase::PlayerTurn;
-        if (turn_ == Disc::White) startAiSearch();
     }
 }
 
@@ -180,44 +191,19 @@ void GameScene::advanceTurn() {
 }
 
 void GameScene::Draw() {
-    const int boardRight = BoardLeft + CellSize * BoardSize;
-    const int boardBottom = BoardTop + CellSize * BoardSize;
-    const int boardColor = GetColor(0, 120, 0);
-    const int lineColor = GetColor(0, 0, 0);
-    const int blackColor = GetColor(0, 0, 0);
     const int whiteColor = GetColor(255, 255, 255);
-    const int legalMoveColor = GetColor(160, 220, 160);
     const int noticeColor = GetColor(255, 220, 80);
-
-    DrawBox(BoardLeft, BoardTop, boardRight, boardBottom, boardColor, TRUE);
-
-    for (int i = 0; i <= BoardSize; ++i) {
-        const int x = BoardLeft + i * CellSize;
-        const int y = BoardTop + i * CellSize;
-        DrawLine(x, BoardTop, x, boardBottom, lineColor);
-        DrawLine(BoardLeft, y, boardRight, y, lineColor);
-    }
 
     const BitBoard::Bits legalMoves =
         !gameOver_ && turn_ == Disc::Black
         ? board_.legalMoves(Disc::Black)
         : 0;
 
-    for (int row = 0; row < BoardSize; ++row) {
-        for (int col = 0; col < BoardSize; ++col) {
-            const float centerX = BoardLeft + (col + 0.5f) * CellSize;
-            const float centerY = BoardTop + (row + 0.5f) * CellSize;
-            const Disc disc = board_.discAt(row, col);
-
-            if (disc == Disc::Black) {
-                DrawCircleAA(centerX, centerY, CellSize * 0.4f, 32, blackColor, TRUE);
-            } else if (disc == Disc::White) {
-                DrawCircleAA(centerX, centerY, CellSize * 0.4f, 32, whiteColor, TRUE);
-            } else if ((legalMoves & BitBoard::bitAt(row, col)) != 0) {
-                DrawCircleAA(centerX, centerY, CellSize * 0.12f, 16, legalMoveColor, TRUE);
-            }
-        }
-    }
+    boardView_.Draw(
+        board_,
+        legalMoves,
+        !boardView_.IsAnimating() && phase_ == Phase::PlayerTurn
+    );
 
     const int blackCount = board_.count(Disc::Black);
     const int whiteCount = board_.count(Disc::White);
@@ -240,6 +226,8 @@ void GameScene::Draw() {
         ).count();
         const int dots = static_cast<int>((elapsed / 300) % 4);
         std::snprintf(status, sizeof(status), "AI is thinking%.*s", dots, "...");
+    } else if (boardView_.IsAnimating()) {
+        std::snprintf(status, sizeof(status), "Flipping discs...");
     } else {
         std::snprintf(status, sizeof(status), "Your turn");
     }

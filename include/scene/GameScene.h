@@ -3,6 +3,7 @@
 #include "core/Ids.h"
 #include "model/BitBoard.h"
 #include "ai/OthelloAI.h"
+#include "view/BoardView.h"
 
 #include <cstdint>
 #include <atomic>
@@ -22,6 +23,7 @@ class GameScene : public SceneBase {
     bool end_ = false;
     SceneID next_ = SceneID::Game;
     BitBoard board_;
+    BoardView boardView_;
     OthelloAI ai_{ 5 };
     Disc turn_ = Disc::Black;
     Disc passed_ = Disc::Empty;
@@ -39,11 +41,6 @@ class GameScene : public SceneBase {
     std::atomic<bool> aiFinished_{ false };
     std::chrono::steady_clock::time_point aiStartedAt_;
     std::jthread aiThread_;
-
-    static constexpr int BoardSize = BitBoard::Size;
-    static constexpr int CellSize = 32;
-    static constexpr int BoardLeft = 200;
-    static constexpr int BoardTop = 80;
 
     void handleBoardClick();
     void performAiMove();
