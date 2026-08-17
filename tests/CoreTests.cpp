@@ -165,7 +165,9 @@ namespace {
                 Bits moves = board.legalMoves(turn);
 
                 if (moves == 0) {
-                    observedPass = true;
+                    if (board.hasAnyMove(opposite(turn))) {
+                        observedPass = true;
+                    }
                     ++consecutivePasses;
                     turn = opposite(turn);
                     continue;
