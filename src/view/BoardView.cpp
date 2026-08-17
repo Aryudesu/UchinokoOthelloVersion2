@@ -142,7 +142,8 @@ void BoardView::Draw(
     if (!loaded_) return;
 
     const auto& images = ImageManager::GetInstance();
-    const int gradientBase = (GetNowCount() / 90) % BoardFrameCount;
+    const int gradientBase =
+        (GetNowCount() / BoardFrameDurationMs) % BoardFrameCount;
     const int animationElapsed = animatedBits_ == 0
         ? FlipFrameCount * FlipFrameDurationMs
         : GetNowCount() - animationStartedAt_;
