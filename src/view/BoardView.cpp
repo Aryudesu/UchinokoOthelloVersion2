@@ -116,7 +116,7 @@ int BoardView::stoneFrameAt(
 
     if ((animatedBits_ & bit) != 0) {
         const Disc previous = beforeMove_.discAt(row, col);
-        const int step = std::min(
+        const int step = (std::min)(
             elapsedMs / FlipFrameDurationMs,
             FlipFrameCount - 1
         );
