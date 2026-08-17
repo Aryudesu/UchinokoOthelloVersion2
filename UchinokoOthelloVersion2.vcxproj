@@ -39,6 +39,7 @@
     <ClInclude Include="include\model\BitBoard.h" />
     <ClInclude Include="include\core\FramePacer.h" />
     <ClInclude Include="include\scene\GameScene.h" />
+    <ClInclude Include="include\animation\SpriteAnimator.h" />
     <ClInclude Include="include\view\BoardView.h" />
     <ClInclude Include="include\core\Ids.h" />
     <ClInclude Include="include\manager\ImageManager.h" />
