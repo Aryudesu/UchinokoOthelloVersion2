@@ -1,6 +1,7 @@
 #pragma once
 
 #include "model/BitBoard.h"
+#include "ai/OpeningBook.h"
 
 #include <atomic>
 #include <cstdint>
@@ -30,6 +31,7 @@ public:
         bool exactSearch = false;
         std::uint64_t transpositionHits = 0;
         int completedIterations = 0;
+        bool openingBook = false;
     };
 
     explicit OthelloAI(int depth = 5) noexcept;
@@ -81,6 +83,7 @@ private:
     };
 
     int depth_ = 5;
+    OpeningBook openingBook_;
     int exactEndgameEmpty_ = 14;
     mutable std::uint64_t searchedNodes_ = 0;
     mutable std::uint64_t transpositionHits_ = 0;

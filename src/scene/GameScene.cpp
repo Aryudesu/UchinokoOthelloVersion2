@@ -35,6 +35,7 @@ void GameScene::Start() {
     aiExactSearch_ = false;
     aiTranspositionHits_ = 0;
     aiIterations_ = 0;
+    aiOpeningBook_ = false;
     phase_ = Phase::PlayerTurn;
     aiFinished_.store(false, std::memory_order_relaxed);
     pendingAiMove_.reset();
@@ -123,6 +124,7 @@ void GameScene::performAiMove() {
         aiExactSearch_ = move->exactSearch;
         aiTranspositionHits_ = move->transpositionHits;
         aiIterations_ = move->completedIterations;
+        aiOpeningBook_ = move->openingBook;
         advanceTurn();
     }
 }
@@ -249,16 +251,20 @@ void GameScene::Draw() {
     const bool displayExact = thinking
         ? aiProgress_.exactSearch.load(std::memory_order_relaxed)
         : aiExactSearch_;
-    std::snprintf(
-        aiInfo,
-        sizeof(aiInfo),
-        "AI depth: %d/%d  Nodes: %llu  TT: %llu%s",
-        displayDepth,
-        targetDepth > 0 ? targetDepth : ai_.depth(),
-        static_cast<unsigned long long>(displayNodes),
-        static_cast<unsigned long long>(displayHits),
-        displayExact ? "  EXACT" : ""
-    );
+    if (!thinking && aiOpeningBook_) {
+        std::snprintf(aiInfo, sizeof(aiInfo), "AI: OPENING BOOK");
+    } else {
+        std::snprintf(
+            aiInfo,
+            sizeof(aiInfo),
+            "AI depth: %d/%d  Nodes: %llu  TT: %llu%s",
+            displayDepth,
+            targetDepth > 0 ? targetDepth : ai_.depth(),
+            static_cast<unsigned long long>(displayNodes),
+            static_cast<unsigned long long>(displayHits),
+            displayExact ? "  EXACT" : ""
+        );
+    }
 
     DrawString(32, 32, "Othello vs AI", whiteColor);
     DrawString(32, 56, "Click a legal move / ESC : Back to Title", whiteColor);

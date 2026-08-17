@@ -57,6 +57,21 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
         return std::nullopt;
     }
 
+    if (const auto bookMove = openingBook_.findMove(board, disc)) {
+        if (progress) progress->reset(0, false);
+        return Move{
+            bookMove->row,
+            bookMove->col,
+            0,
+            0,
+            0,
+            false,
+            0,
+            0,
+            true,
+        };
+    }
+
     const int emptyCount = 64 - board.count(Disc::Black) - board.count(Disc::White);
     const bool exactSearch = emptyCount <= exactEndgameEmpty_;
     const int searchDepth = exactSearch ? emptyCount : depth_;
@@ -310,6 +325,7 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
             false,
             0,
             0,
+            false,
         });
         BitBoard child = board;
         child.put(disc, index / BitBoard::Size, index % BitBoard::Size);
