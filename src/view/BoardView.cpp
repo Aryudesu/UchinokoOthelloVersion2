@@ -4,8 +4,6 @@
 #include "manager/ImageManager.h"
 #include "DxLib.h"
 
-#include <algorithm>
-
 namespace {
     constexpr int SheetColumns = 3;
     constexpr int SheetRows = 4;
@@ -53,6 +51,10 @@ void BoardView::Start() {
         "data/img/stone.bmp"
     );
 
+    boardAnimator_.Play(
+        { 0, BoardFrameCount, BoardFrameDurationMs, true },
+        GetNowCount()
+    );
     loaded_ = true;
 }
 
@@ -63,23 +65,30 @@ void BoardView::End() {
     images.Destroy(ImageID::Stone);
     images.Destroy(ImageID::Board);
     images.Destroy(ImageID::Frame);
+
+    boardAnimator_.Reset();
+    flipAnimator_.Reset();
     loaded_ = false;
 }
 
 void BoardView::Reset(const BitBoard& board) {
     beforeMove_ = board;
     animatedBits_ = 0;
-    animationStartedAt_ = 0;
+    flipAnimator_.Reset();
     lastMoveRow_ = -1;
     lastMoveCol_ = -1;
 }
 
 void BoardView::Update() {
+    const int nowMs = GetNowCount();
+    boardAnimator_.Update(nowMs);
+
     if (animatedBits_ == 0) return;
 
-    const int elapsed = GetNowCount() - animationStartedAt_;
-    if (elapsed >= FlipFrameCount * FlipFrameDurationMs) {
+    flipAnimator_.Update(nowMs);
+    if (flipAnimator_.IsFinished()) {
         animatedBits_ = 0;
+        flipAnimator_.Reset();
     }
 }
 
@@ -98,7 +107,15 @@ void BoardView::BeginMove(
     // only discs that actually change colour use frames 3..8.
     animatedBits_ &= ~BitBoard::bitAt(row, col);
 
-    animationStartedAt_ = GetNowCount();
+    if (animatedBits_ != 0) {
+        flipAnimator_.Play(
+            { 0, FlipFrameCount, FlipFrameDurationMs, false },
+            GetNowCount()
+        );
+    } else {
+        flipAnimator_.Reset();
+    }
+
     lastMoveRow_ = row;
     lastMoveCol_ = col;
 
@@ -108,18 +125,14 @@ void BoardView::BeginMove(
 int BoardView::stoneFrameAt(
     const BitBoard& board,
     int row,
-    int col,
-    int elapsedMs
+    int col
 ) const noexcept {
     const Disc current = board.discAt(row, col);
     const BitBoard::Bits bit = BitBoard::bitAt(row, col);
 
     if ((animatedBits_ & bit) != 0) {
         const Disc previous = beforeMove_.discAt(row, col);
-        const int step = (std::min)(
-            elapsedMs / FlipFrameDurationMs,
-            FlipFrameCount - 1
-        );
+        const int step = flipAnimator_.CurrentFrame();
 
         if (previous == Disc::Black && current == Disc::White) {
             return StoneBlackToWhiteFirst + step;
@@ -142,11 +155,7 @@ void BoardView::Draw(
     if (!loaded_) return;
 
     const auto& images = ImageManager::GetInstance();
-    const int gradientBase =
-        (GetNowCount() / BoardFrameDurationMs) % BoardFrameCount;
-    const int animationElapsed = animatedBits_ == 0
-        ? FlipFrameCount * FlipFrameDurationMs
-        : GetNowCount() - animationStartedAt_;
+    const int gradientBase = boardAnimator_.CurrentFrame();
 
     for (int row = 0; row < BoardSize; ++row) {
         for (int col = 0; col < BoardSize; ++col) {
@@ -157,12 +166,7 @@ void BoardView::Draw(
 
             images.Draw(x, y, ImageID::Board, boardFrame, false);
 
-            const int stoneFrame = stoneFrameAt(
-                board,
-                row,
-                col,
-                animationElapsed
-            );
+            const int stoneFrame = stoneFrameAt(board, row, col);
             if (stoneFrame != StoneEmpty) {
                 images.Draw(x, y, ImageID::Stone, stoneFrame);
             } else if (
