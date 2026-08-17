@@ -159,7 +159,6 @@ void GameScene::finishAiSearch() {
         phase_ = turn_ == Disc::White
             ? Phase::ApplyingAiMove
             : Phase::PlayerTurn;
-        if (turn_ == Disc::White) startAiSearch();
     }
 }
 
