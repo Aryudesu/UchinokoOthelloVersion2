@@ -7,8 +7,7 @@ namespace {
 }
 
 ImageManager::ImageManager() {
-    // enum の数が確定しているなら reserve しておくのもアリ
-    imgs_.resize(static_cast<int>(ImageID::Item) + 1); // 仮：最後のIDに合わせる
+    imgs_.resize(static_cast<int>(ImageID::Count));
 }
 
 ImageManager::~ImageManager() {
@@ -37,15 +36,12 @@ const std::vector<ImageManager::Handle>& ImageManager::getSlot(ImageID id) const
     return imgs_[idx];
 }
 
-// 透過色設定
 void ImageManager::SetTrans(int r, int g, int b) {
     SetTransColor(r, g, b);
 }
 
-// 単一画像読み込み
 void ImageManager::Load(ImageID id, const std::string& filename) {
     auto& slot = getSlot(id);
-    // 既存があれば削除
     for (auto& h : slot) safeDelete(h);
     slot.clear();
 
@@ -53,7 +49,6 @@ void ImageManager::Load(ImageID id, const std::string& filename) {
     slot[0] = LoadGraph(filename.c_str());
 }
 
-// 分割画像読み込み
 void ImageManager::LoadDiv(ImageID id, int sizex, int sizey,
     int cutX, int cutY,
     const std::string& filename) {
@@ -66,12 +61,10 @@ void ImageManager::LoadDiv(ImageID id, int sizex, int sizey,
     LoadDivGraph(filename.c_str(), num, cutX, cutY, sizex, sizey, slot.data());
 }
 
-// シート読み込み（32x32固定）
 void ImageManager::LoadSheet(ImageID id, int cutX, int cutY, const std::string& filename) {
     LoadDiv(id, 32, 32, cutX, cutY, filename);
 }
 
-// サイズ取得（num指定）
 void ImageManager::Size(ImageID id, int num, int& width, int& height) const {
     const auto& slot = getSlot(id);
     assert(num >= 0 && num < static_cast<int>(slot.size()));
@@ -81,26 +74,22 @@ void ImageManager::Size(ImageID id, int num, int& width, int& height) const {
     height = h;
 }
 
-// 最初の画像のサイズ
 void ImageManager::Size(ImageID id, int& width, int& height) const {
     Size(id, 0, width, height);
 }
 
-// 描画
 void ImageManager::Draw(float x, float y,
     ImageID id, int num,
     bool transFlag, bool turnY) const {
     const auto& slot = getSlot(id);
-    if (num < 0 || num >= static_cast<int>(slot.size())) return; // 安全側
+    if (num < 0 || num >= static_cast<int>(slot.size())) return;
     int h = slot[num];
     if (h == INVALID_HANDLE) return;
 
-    // 必要なら Rota じゃなく普通の DrawGraph でもOK（用途で選んで）
-    DrawGraphF(x, y, h, transFlag?TRUE:FALSE);
-    // もし上下反転や回転を使いたいなら DrawRotaGraph2F などに差し替え
+    DrawGraphF(x, y, h, transFlag ? TRUE : FALSE);
+    (void)turnY;
 }
 
-// IDのオブジェクトの画像破棄
 void ImageManager::Destroy(ImageID id) {
     auto& slot = getSlot(id);
     for (auto& h : slot) {
@@ -109,7 +98,6 @@ void ImageManager::Destroy(ImageID id) {
     slot.clear();
 }
 
-// 全部破棄
 void ImageManager::DeleteAll() {
     for (auto& slot : imgs_) {
         for (auto& h : slot) {
@@ -117,6 +105,4 @@ void ImageManager::DeleteAll() {
         }
         slot.clear();
     }
-    // 必要ならサイズを維持してもいいし、クリアしてもいい
-    // imgs_.clear();
 }
