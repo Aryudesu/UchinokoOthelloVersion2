@@ -1,5 +1,6 @@
 #pragma once
 
+#include "animation/SpriteAnimator.h"
 #include "model/BitBoard.h"
 
 class BoardView {
@@ -28,8 +29,16 @@ public:
         bool showLegalMoves
     ) const;
 
-    [[nodiscard]] bool HitTest(int mouseX, int mouseY, int& row, int& col) const noexcept;
-    [[nodiscard]] bool IsAnimating() const noexcept { return animatedBits_ != 0; }
+    [[nodiscard]] bool HitTest(
+        int mouseX,
+        int mouseY,
+        int& row,
+        int& col
+    ) const noexcept;
+
+    [[nodiscard]] bool IsAnimating() const noexcept {
+        return animatedBits_ != 0;
+    }
 
 private:
     // stone.bmp indices. Keeping these names here makes a future 9/10 swap local.
@@ -48,7 +57,8 @@ private:
 
     BitBoard beforeMove_;
     BitBoard::Bits animatedBits_ = 0;
-    int animationStartedAt_ = 0;
+    SpriteAnimator boardAnimator_;
+    SpriteAnimator flipAnimator_;
     int lastMoveRow_ = -1;
     int lastMoveCol_ = -1;
     bool loaded_ = false;
@@ -56,7 +66,6 @@ private:
     [[nodiscard]] int stoneFrameAt(
         const BitBoard& board,
         int row,
-        int col,
-        int elapsedMs
+        int col
     ) const noexcept;
 };
