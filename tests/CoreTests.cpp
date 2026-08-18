@@ -1,7 +1,7 @@
 #include "ai/OthelloAI.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
-#include "model/BitBoard.h"
+#include "model/BitBoard.h"\n#include "model/MatchResult.h"
 
 #include <bit>
 #include <cstdint>
@@ -151,6 +151,25 @@ namespace {
         require(board.discAt(-1, 0) == Disc::Empty, "Out-of-range read failed");
 
         verifyAgainstReference(board);
+    }
+
+    void testMatchResult() {
+        BitBoard board;
+        const MatchResult initial = MatchResult::From(board);
+        require(initial.blackCount == 2, "Initial result black count is wrong");
+        require(initial.whiteCount == 2, "Initial result white count is wrong");
+        require(initial.difference == 0, "Initial result difference is wrong");
+        require(initial.winner == MatchWinner::Draw, "Equal score must be draw");
+
+        require(board.put(Disc::Black, 4, 5), "Could not build result test");
+        const MatchResult blackLead = MatchResult::From(board);
+        require(blackLead.blackCount == 4, "Result black count is wrong");
+        require(blackLead.whiteCount == 1, "Result white count is wrong");
+        require(blackLead.difference == 3, "Result difference is wrong");
+        require(
+            blackLead.winner == MatchWinner::Black,
+            "Black lead was not recognized"
+        );
     }
 
     void testRandomGamesAndPasses() {
