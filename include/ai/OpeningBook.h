@@ -6,6 +6,7 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_map>
 #include <vector>
 
 class OpeningBook {
@@ -21,6 +22,11 @@ public:
         const BitBoard& board,
         Disc turn
     ) const;
+
+    [[nodiscard]] std::u8string_view completedName(
+        const BitBoard& board,
+        Disc turn
+    ) const noexcept;
 
     [[nodiscard]] std::size_t positionCount() const noexcept {
         return entries_.size();
@@ -50,9 +56,14 @@ private:
     };
 
     std::unordered_map<PositionKey, std::vector<int>, PositionKeyHash> entries_;
+    std::unordered_map<PositionKey, std::u8string_view, PositionKeyHash>
+        completedNames_;
     std::size_t lineCount_ = 0;
 
-    [[nodiscard]] bool addNotationLine(std::string_view notation);
+    [[nodiscard]] bool addNotationLine(
+        std::string_view notation,
+        std::u8string_view name
+    );
     [[nodiscard]] bool addLine(const std::vector<int>& moves);
     [[nodiscard]] static CanonicalPosition canonicalize(
         const BitBoard& board,
