@@ -62,6 +62,9 @@
     <ClInclude Include="include\model\BitBoard.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\model\MatchResult.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="include\scene\TitleScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
