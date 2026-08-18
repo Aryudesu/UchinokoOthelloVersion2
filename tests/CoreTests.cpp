@@ -280,6 +280,38 @@ namespace {
             book.positionCount() > 1'000,
             "OpeningBook contains too few normalized positions"
         );
+
+        BitBoard rabbit;
+        Disc rabbitTurn = Disc::Black;
+        const auto playUntil = [&](std::string_view notation) {
+            const std::size_t occupiedMoves =
+                static_cast<std::size_t>(
+                    rabbit.count(Disc::Black) + rabbit.count(Disc::White) - 4
+                );
+            for (std::size_t i = occupiedMoves * 2; i < notation.size(); i += 2) {
+                const int col = notation[i] - 'a';
+                const int row = notation[i + 1] - '1';
+                require(
+                    rabbit.put(rabbitTurn, row, col),
+                    "Could not replay named opening"
+                );
+                rabbitTurn = opposite(rabbitTurn);
+            }
+        };
+
+        playUntil(LegacyOpeningLines[0].moves);
+        require(
+            book.completedName(rabbit, rabbitTurn) ==
+                LegacyOpeningLines[0].name,
+            "Short opening name was not recognized"
+        );
+
+        playUntil(LegacyOpeningLines[1].moves);
+        require(
+            book.completedName(rabbit, rabbitTurn) ==
+                LegacyOpeningLines[1].name,
+            "Opening name did not advance to the deeper variation"
+        );
     }
 
     void testAiReturnsLegalMove() {

@@ -43,6 +43,13 @@ public:
         return exactEndgameEmpty_;
     }
 
+    [[nodiscard]] std::u8string_view completedOpeningName(
+        const BitBoard& board,
+        Disc turn
+    ) const noexcept {
+        return openingBook_.completedName(board, turn);
+    }
+
     [[nodiscard]] std::optional<Move> chooseMove(
         const BitBoard& board,
         Disc disc,

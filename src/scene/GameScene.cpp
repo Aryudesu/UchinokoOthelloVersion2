@@ -1,12 +1,42 @@
+#define NOMINMAX
 #include "scene/GameScene.h"
 #include "manager/InputManager.h"
 #include "DxLib.h"
+#include <Windows.h>
 
 #include <cstdio>
 
 namespace {
     Disc opponentOf(Disc disc) {
         return disc == Disc::Black ? Disc::White : Disc::Black;
+    }
+
+    std::string utf8ToLocal(std::u8string_view text) {
+        if (text.empty()) return {};
+
+        const char* bytes = reinterpret_cast<const char*>(text.data());
+        const int byteCount = static_cast<int>(text.size());
+        const int wideCount = MultiByteToWideChar(
+            CP_UTF8, 0, bytes, byteCount, nullptr, 0
+        );
+        if (wideCount <= 0) return {};
+
+        std::wstring wide(static_cast<std::size_t>(wideCount), L'\0');
+        MultiByteToWideChar(
+            CP_UTF8, 0, bytes, byteCount, wide.data(), wideCount
+        );
+
+        const int localCount = WideCharToMultiByte(
+            CP_ACP, 0, wide.data(), wideCount, nullptr, 0, nullptr, nullptr
+        );
+        if (localCount <= 0) return {};
+
+        std::string local(static_cast<std::size_t>(localCount), '\0');
+        WideCharToMultiByte(
+            CP_ACP, 0, wide.data(), wideCount,
+            local.data(), localCount, nullptr, nullptr
+        );
+        return local;
     }
 
     const char* discName(Disc disc) {
@@ -36,6 +66,7 @@ void GameScene::Start() {
     aiTranspositionHits_ = 0;
     aiIterations_ = 0;
     aiOpeningBook_ = false;
+    openingName_.clear();
     phase_ = Phase::PlayerTurn;
     aiFinished_.store(false, std::memory_order_relaxed);
     pendingAiMove_.reset();
@@ -94,6 +125,7 @@ void GameScene::handleBoardClick() {
     const BitBoard before = board_;
     if (board_.put(Disc::Black, row, col)) {
         boardView_.BeginMove(before, board_, Disc::Black, row, col);
+        updateOpeningName();
         advanceTurn();
     }
 }
@@ -125,6 +157,7 @@ void GameScene::performAiMove() {
         aiTranspositionHits_ = move->transpositionHits;
         aiIterations_ = move->completedIterations;
         aiOpeningBook_ = move->openingBook;
+        updateOpeningName();
         advanceTurn();
     }
 }
@@ -172,6 +205,13 @@ void GameScene::cancelAiSearch() {
     aiFinished_.store(false, std::memory_order_relaxed);
     std::lock_guard lock(aiResultMutex_);
     pendingAiMove_.reset();
+}
+
+void GameScene::updateOpeningName() {
+    const Disc nextTurn = opponentOf(turn_);
+    const std::u8string_view name =
+        ai_.completedOpeningName(board_, nextTurn);
+    if (!name.empty()) openingName_ = utf8ToLocal(name);
 }
 
 void GameScene::advanceTurn() {
@@ -272,10 +312,15 @@ void GameScene::Draw() {
     DrawString(32, 104, status, gameOver_ ? noticeColor : whiteColor);
     DrawString(32, 128, aiInfo, whiteColor);
 
+    if (!openingName_.empty()) {
+        const std::string openingInfo = "Opening: " + openingName_;
+        DrawString(32, 152, openingInfo.c_str(), noticeColor);
+    }
+
     if (passed_ != Disc::Empty) {
         char passMessage[64];
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
-        DrawString(32, 152, passMessage, noticeColor);
+        DrawString(32, openingName_.empty() ? 152 : 176, passMessage, noticeColor);
     }
 }
 
