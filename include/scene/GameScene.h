@@ -11,6 +11,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <string>
 
 class GameScene : public SceneBase {
     enum class Phase {
@@ -35,6 +36,7 @@ class GameScene : public SceneBase {
     std::uint64_t aiTranspositionHits_ = 0;
     int aiIterations_ = 0;
     bool aiOpeningBook_ = false;
+    std::string openingName_;
     Phase phase_ = Phase::PlayerTurn;
     OthelloAI::SearchProgress aiProgress_;
     std::optional<OthelloAI::Move> pendingAiMove_;
@@ -49,6 +51,7 @@ class GameScene : public SceneBase {
     void startAiSearch();
     void finishAiSearch();
     void cancelAiSearch();
+    void updateOpeningName();
 
 public:
     ~GameScene() override;
