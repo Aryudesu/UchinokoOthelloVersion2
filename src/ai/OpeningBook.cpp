@@ -19,7 +19,7 @@ namespace {
 OpeningBook::OpeningBook() {
     entries_.reserve(LegacyOpeningLines.size() * 8);
     for (const OpeningLine& line : LegacyOpeningLines) {
-        if (addNotationLine(line.moves)) ++lineCount_;
+        if (addNotationLine(line.moves, line.name)) ++lineCount_;
     }
 }
 
@@ -44,7 +44,10 @@ std::optional<OpeningBook::Move> OpeningBook::findMove(
     return std::nullopt;
 }
 
-bool OpeningBook::addNotationLine(std::string_view notation) {
+bool OpeningBook::addNotationLine(
+    std::string_view notation,
+    std::u8string_view name
+) {
     if (notation.empty() || notation.size() % 2 != 0) return false;
 
     std::vector<int> moves;
@@ -58,7 +61,34 @@ bool OpeningBook::addNotationLine(std::string_view notation) {
         }
         moves.push_back(row * BitBoard::Size + col);
     }
-    return addLine(moves);
+    if (!addLine(moves)) return false;
+
+    BitBoard completedBoard;
+    Disc nextTurn = Disc::Black;
+    for (const int moveIndex : moves) {
+        completedBoard.put(
+            nextTurn,
+            moveIndex / BitBoard::Size,
+            moveIndex % BitBoard::Size
+        );
+        nextTurn = opponentOf(nextTurn);
+    }
+    completedNames_.try_emplace(
+        canonicalize(completedBoard, nextTurn).key,
+        name
+    );
+    return true;
+}
+
+std::u8string_view OpeningBook::completedName(
+    const BitBoard& board,
+    Disc turn
+) const noexcept {
+    if (turn == Disc::Empty) return {};
+    const auto found = completedNames_.find(canonicalize(board, turn).key);
+    return found == completedNames_.end()
+        ? std::u8string_view{}
+        : found->second;
 }
 
 bool OpeningBook::addLine(const std::vector<int>& moves) {
