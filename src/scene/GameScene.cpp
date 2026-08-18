@@ -129,6 +129,7 @@ void GameScene::resetMatch() {
     passed_ = Disc::Empty;
     gameOver_ = false;
     mouseLeftDown_ = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
+    GetMousePoint(&resultMouseX_, &resultMouseY_);
     aiSearchedNodes_ = 0;
     aiSearchDepth_ = 0;
     aiExactSearch_ = false;
@@ -160,6 +161,11 @@ void GameScene::handleResultInput(bool clicked) {
     int mouseY = 0;
     GetMousePoint(&mouseX, &mouseY);
 
+    const bool mouseMoved =
+        mouseX != resultMouseX_ || mouseY != resultMouseY_;
+    resultMouseX_ = mouseX;
+    resultMouseY_ = mouseY;
+
     const bool overRematch = insideRect(
         mouseX, mouseY,
         RematchLeft, ButtonTop, RematchRight, ButtonBottom
@@ -177,9 +183,9 @@ void GameScene::handleResultInput(bool clicked) {
         return;
     }
 
-    // Do not let a stationary mouse cancel a keyboard selection in the same
-    // frame. Enter always applies the currently highlighted choice.
-    if (!changedByKeyboard) {
+    // A stationary cursor must not overwrite a keyboard selection on the
+    // following frame. Hover selection changes only when the mouse moves.
+    if (mouseMoved && !changedByKeyboard) {
         if (overRematch) resultChoice_ = ResultChoice::Rematch;
         if (overTitle) resultChoice_ = ResultChoice::Title;
     }
