@@ -39,6 +39,25 @@ namespace {
         return local;
     }
 
+
+    constexpr int ResultPanelLeft = 180;
+    constexpr int ResultPanelTop = 150;
+    constexpr int ResultPanelRight = 540;
+    constexpr int ResultPanelBottom = 350;
+    constexpr int RematchLeft = 220;
+    constexpr int RematchRight = 340;
+    constexpr int TitleLeft = 380;
+    constexpr int TitleRight = 500;
+    constexpr int ButtonTop = 295;
+    constexpr int ButtonBottom = 330;
+
+    bool insideRect(
+        int x, int y,
+        int left, int top, int right, int bottom
+    ) noexcept {
+        return left <= x && x < right && top <= y && y < bottom;
+    }
+
     const char* discName(Disc disc) {
         if (disc == Disc::Black) return "Black";
         if (disc == Disc::White) return "White";
@@ -51,25 +70,8 @@ GameScene::~GameScene() {
 }
 
 void GameScene::Start() {
-    end_ = false;
-    next_ = SceneID::Game;
-    board_.reset();
     boardView_.Start();
-    boardView_.Reset(board_);
-    turn_ = Disc::Black;
-    passed_ = Disc::Empty;
-    gameOver_ = false;
-    mouseLeftDown_ = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
-    aiSearchedNodes_ = 0;
-    aiSearchDepth_ = 0;
-    aiExactSearch_ = false;
-    aiTranspositionHits_ = 0;
-    aiIterations_ = 0;
-    aiOpeningBook_ = false;
-    openingName_.clear();
-    phase_ = Phase::PlayerTurn;
-    aiFinished_.store(false, std::memory_order_relaxed);
-    pendingAiMove_.reset();
+    resetMatch();
 }
 
 void GameScene::End() {
@@ -101,7 +103,10 @@ void GameScene::Update() {
     // or start the AI until all three transition frames have been displayed.
     if (boardView_.IsAnimating()) return;
 
-    if (gameOver_) return;
+    if (gameOver_) {
+        handleResultInput(clicked);
+        return;
+    }
 
     if (turn_ == Disc::White) {
         startAiSearch();
@@ -111,6 +116,77 @@ void GameScene::Update() {
     if (clicked) {
         handleBoardClick();
     }
+}
+
+void GameScene::resetMatch() {
+    cancelAiSearch();
+
+    end_ = false;
+    next_ = SceneID::Game;
+    board_.reset();
+    boardView_.Reset(board_);
+    turn_ = Disc::Black;
+    passed_ = Disc::Empty;
+    gameOver_ = false;
+    mouseLeftDown_ = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
+    aiSearchedNodes_ = 0;
+    aiSearchDepth_ = 0;
+    aiExactSearch_ = false;
+    aiTranspositionHits_ = 0;
+    aiIterations_ = 0;
+    aiOpeningBook_ = false;
+    openingName_.clear();
+    resultChoice_ = ResultChoice::Rematch;
+    phase_ = Phase::PlayerTurn;
+    aiProgress_.reset(0, false);
+    aiFinished_.store(false, std::memory_order_relaxed);
+}
+
+void GameScene::handleResultInput(bool clicked) {
+    auto& input = InputManager::GetInstance();
+
+    if (
+        input.isPressed(KEY_INPUT_LEFT) ||
+        input.isPressed(KEY_INPUT_RIGHT) ||
+        input.isPressed(KEY_INPUT_UP) ||
+        input.isPressed(KEY_INPUT_DOWN)
+    ) {
+        resultChoice_ = resultChoice_ == ResultChoice::Rematch
+            ? ResultChoice::Title
+            : ResultChoice::Rematch;
+    }
+
+    int mouseX = 0;
+    int mouseY = 0;
+    GetMousePoint(&mouseX, &mouseY);
+    if (insideRect(
+        mouseX, mouseY,
+        RematchLeft, ButtonTop, RematchRight, ButtonBottom
+    )) {
+        resultChoice_ = ResultChoice::Rematch;
+        if (clicked) applyResultChoice();
+        return;
+    }
+    if (insideRect(
+        mouseX, mouseY,
+        TitleLeft, ButtonTop, TitleRight, ButtonBottom
+    )) {
+        resultChoice_ = ResultChoice::Title;
+        if (clicked) applyResultChoice();
+        return;
+    }
+
+    if (input.isPressed(KEY_INPUT_RETURN)) applyResultChoice();
+}
+
+void GameScene::applyResultChoice() {
+    if (resultChoice_ == ResultChoice::Rematch) {
+        resetMatch();
+        return;
+    }
+
+    next_ = SceneID::Title;
+    end_ = true;
 }
 
 void GameScene::handleBoardClick() {
@@ -322,6 +398,63 @@ void GameScene::Draw() {
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
         DrawString(32, openingName_.empty() ? 152 : 176, passMessage, noticeColor);
     }
+
+    if (gameOver_ && !boardView_.IsAnimating()) {
+        drawResult(MatchResult::From(board_));
+    }
+}
+
+void GameScene::drawResult(const MatchResult& result) const {
+    const int white = GetColor(255, 255, 255);
+    const int accent = GetColor(255, 220, 80);
+    const int panel = GetColor(20, 24, 36);
+    const int selected = GetColor(70, 110, 180);
+    const int idle = GetColor(45, 52, 70);
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 220);
+    DrawBox(
+        ResultPanelLeft, ResultPanelTop,
+        ResultPanelRight, ResultPanelBottom,
+        panel, TRUE
+    );
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    const char* headline = "DRAW";
+    if (result.winner == MatchWinner::Black) headline = "YOU WIN!";
+    if (result.winner == MatchWinner::White) headline = "AI WINS";
+    DrawString(310, 175, headline, accent);
+
+    char finalScore[64];
+    std::snprintf(
+        finalScore, sizeof(finalScore),
+        "BLACK %d  -  %d WHITE",
+        result.blackCount, result.whiteCount
+    );
+    DrawString(270, 210, finalScore, white);
+
+    char difference[64];
+    std::snprintf(
+        difference, sizeof(difference),
+        result.difference == 0
+            ? "EVEN GAME"
+            : "DIFFERENCE: %d",
+        result.difference
+    );
+    DrawString(300, 240, difference, white);
+    DrawString(260, 268, "Select with mouse or arrow keys", white);
+
+    DrawBox(
+        RematchLeft, ButtonTop, RematchRight, ButtonBottom,
+        resultChoice_ == ResultChoice::Rematch ? selected : idle,
+        TRUE
+    );
+    DrawBox(
+        TitleLeft, ButtonTop, TitleRight, ButtonBottom,
+        resultChoice_ == ResultChoice::Title ? selected : idle,
+        TRUE
+    );
+    DrawString(246, 305, "REMATCH", white);
+    DrawString(420, 305, "TITLE", white);
 }
 
 bool GameScene::IsEnd() const {
