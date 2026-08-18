@@ -145,12 +145,12 @@ void GameScene::resetMatch() {
 void GameScene::handleResultInput(bool clicked) {
     auto& input = InputManager::GetInstance();
 
-    if (
+    const bool changedByKeyboard =
         input.isPressed(KEY_INPUT_LEFT) ||
         input.isPressed(KEY_INPUT_RIGHT) ||
         input.isPressed(KEY_INPUT_UP) ||
-        input.isPressed(KEY_INPUT_DOWN)
-    ) {
+        input.isPressed(KEY_INPUT_DOWN);
+    if (changedByKeyboard) {
         resultChoice_ = resultChoice_ == ResultChoice::Rematch
             ? ResultChoice::Title
             : ResultChoice::Rematch;
@@ -159,21 +159,29 @@ void GameScene::handleResultInput(bool clicked) {
     int mouseX = 0;
     int mouseY = 0;
     GetMousePoint(&mouseX, &mouseY);
-    if (insideRect(
+
+    const bool overRematch = insideRect(
         mouseX, mouseY,
         RematchLeft, ButtonTop, RematchRight, ButtonBottom
-    )) {
-        resultChoice_ = ResultChoice::Rematch;
-        if (clicked) applyResultChoice();
-        return;
-    }
-    if (insideRect(
+    );
+    const bool overTitle = insideRect(
         mouseX, mouseY,
         TitleLeft, ButtonTop, TitleRight, ButtonBottom
-    )) {
-        resultChoice_ = ResultChoice::Title;
-        if (clicked) applyResultChoice();
+    );
+
+    if (clicked && (overRematch || overTitle)) {
+        resultChoice_ = overRematch
+            ? ResultChoice::Rematch
+            : ResultChoice::Title;
+        applyResultChoice();
         return;
+    }
+
+    // Do not let a stationary mouse cancel a keyboard selection in the same
+    // frame. Enter always applies the currently highlighted choice.
+    if (!changedByKeyboard) {
+        if (overRematch) resultChoice_ = ResultChoice::Rematch;
+        if (overTitle) resultChoice_ = ResultChoice::Title;
     }
 
     if (input.isPressed(KEY_INPUT_RETURN)) applyResultChoice();
