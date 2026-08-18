@@ -36,6 +36,8 @@ class GameScene : public SceneBase {
     Disc passed_ = Disc::Empty;
     bool gameOver_ = false;
     bool mouseLeftDown_ = false;
+    int resultMouseX_ = 0;
+    int resultMouseY_ = 0;
     std::uint64_t aiSearchedNodes_ = 0;
     int aiSearchDepth_ = 0;
     bool aiExactSearch_ = false;
