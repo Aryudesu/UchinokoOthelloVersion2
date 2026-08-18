@@ -1,5 +1,6 @@
 #include "ai/OthelloAI.h"
 #include "ai/OpeningBook.h"
+#include "ai/OpeningBookData.h"
 #include "model/BitBoard.h"
 
 #include <bit>
@@ -245,6 +246,42 @@ namespace {
         return best;
     }
 
+    void testLegacyOpeningBook() {
+        require(
+            LegacyOpeningLines.size() == 244,
+            "Legacy opening line count changed"
+        );
+
+        for (const OpeningLine& line : LegacyOpeningLines) {
+            BitBoard board;
+            Disc turn = Disc::Black;
+            require(
+                !line.moves.empty() && line.moves.size() % 2 == 0,
+                "Opening notation has an invalid length"
+            );
+
+            for (std::size_t i = 0; i < line.moves.size(); i += 2) {
+                const int col = line.moves[i] - 'a';
+                const int row = line.moves[i + 1] - '1';
+                require(
+                    board.put(turn, row, col),
+                    "Legacy opening contains an illegal move"
+                );
+                turn = opposite(turn);
+            }
+        }
+
+        OpeningBook book;
+        require(
+            book.lineCount() == LegacyOpeningLines.size(),
+            "OpeningBook rejected a legacy opening line"
+        );
+        require(
+            book.positionCount() > 1'000,
+            "OpeningBook contains too few normalized positions"
+        );
+    }
+
     void testAiReturnsLegalMove() {
         BitBoard board;
         OthelloAI ai(3);
@@ -338,6 +375,7 @@ int main() {
     try {
         testInitialPosition();
         testRandomGamesAndPasses();
+        testLegacyOpeningBook();
         testAiReturnsLegalMove();
         testExactEndgame();
         std::cout << "All core tests passed.\n";

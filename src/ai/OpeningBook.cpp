@@ -1,4 +1,5 @@
 #include "ai/OpeningBook.h"
+#include "ai/OpeningBookData.h"
 
 #include <algorithm>
 #include <array>
@@ -6,10 +7,6 @@
 #include <utility>
 
 namespace {
-    constexpr int square(char file, int rank) noexcept {
-        return (rank - 1) * BitBoard::Size + (file - 'a');
-    }
-
     std::uint64_t mixHash(std::uint64_t value) noexcept {
         value ^= value >> 30;
         value *= 0xbf58476d1ce4e5b9ULL;
@@ -20,30 +17,10 @@ namespace {
 }
 
 OpeningBook::OpeningBook() {
-    // A compact set of established opening branches. Symmetric positions are
-    // normalized, so each line also covers every rotation and reflection.
-    addLine({
-        square('f', 5), square('d', 6), square('c', 3),
-        square('d', 3), square('c', 4), square('f', 4),
-        square('f', 6), square('f', 3), square('e', 3),
-    });
-    addLine({
-        square('f', 5), square('f', 6), square('e', 6),
-        square('f', 4), square('e', 3), square('d', 6),
-        square('c', 5),
-    });
-    addLine({
-        square('d', 3), square('c', 3), square('c', 4),
-        square('e', 3), square('f', 4), square('c', 5),
-    });
-    addLine({
-        square('c', 4), square('c', 3), square('d', 3),
-        square('c', 5), square('b', 4),
-    });
-    addLine({
-        square('e', 6), square('f', 6), square('f', 5),
-        square('d', 6), square('c', 5), square('f', 4),
-    });
+    entries_.reserve(LegacyOpeningLines.size() * 8);
+    for (const OpeningLine& line : LegacyOpeningLines) {
+        if (addNotationLine(line.moves)) ++lineCount_;
+    }
 }
 
 std::optional<OpeningBook::Move> OpeningBook::findMove(
@@ -67,15 +44,40 @@ std::optional<OpeningBook::Move> OpeningBook::findMove(
     return std::nullopt;
 }
 
-void OpeningBook::addLine(const std::vector<int>& moves) {
+bool OpeningBook::addNotationLine(std::string_view notation) {
+    if (notation.empty() || notation.size() % 2 != 0) return false;
+
+    std::vector<int> moves;
+    moves.reserve(notation.size() / 2);
+    for (std::size_t i = 0; i < notation.size(); i += 2) {
+        const int col = notation[i] - 'a';
+        const int row = notation[i + 1] - '1';
+        if (row < 0 || row >= BitBoard::Size ||
+            col < 0 || col >= BitBoard::Size) {
+            return false;
+        }
+        moves.push_back(row * BitBoard::Size + col);
+    }
+    return addLine(moves);
+}
+
+bool OpeningBook::addLine(const std::vector<int>& moves) {
+    BitBoard validationBoard;
+    Disc validationTurn = Disc::Black;
+    for (const int moveIndex : moves) {
+        if (!validationBoard.put(
+            validationTurn,
+            moveIndex / BitBoard::Size,
+            moveIndex % BitBoard::Size
+        )) {
+            return false;
+        }
+        validationTurn = opponentOf(validationTurn);
+    }
+
     BitBoard board;
     Disc turn = Disc::Black;
-
     for (const int moveIndex : moves) {
-        const int row = moveIndex / BitBoard::Size;
-        const int col = moveIndex % BitBoard::Size;
-        if (!board.canPut(turn, row, col)) return;
-
         const CanonicalPosition canonical = canonicalize(board, turn);
         const int canonicalMove = transformIndex(
             moveIndex, canonical.transform
@@ -86,9 +88,14 @@ void OpeningBook::addLine(const std::vector<int>& moves) {
             candidates.push_back(canonicalMove);
         }
 
-        board.put(turn, row, col);
+        board.put(
+            turn,
+            moveIndex / BitBoard::Size,
+            moveIndex % BitBoard::Size
+        );
         turn = opponentOf(turn);
     }
+    return true;
 }
 
 OpeningBook::CanonicalPosition OpeningBook::canonicalize(
