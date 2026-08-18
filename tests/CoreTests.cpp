@@ -1,4 +1,5 @@
 #include "ai/OthelloAI.h"
+#include "ai/OpeningBook.h"
 #include "model/BitBoard.h"
 
 #include <bit>
@@ -254,8 +255,28 @@ namespace {
             board.canPut(Disc::Black, move->row, move->col),
             "AI returned an illegal move"
         );
-        require(move->searchedNodes > 0, "AI did not search any nodes");
-        require(move->searchDepth == 3, "AI search depth is incorrect");
+        require(move->openingBook, "Initial move did not use opening book");
+        require(move->searchedNodes == 0, "Opening book unexpectedly searched");
+        require(move->searchDepth == 0, "Opening book has a search depth");
+
+        // Leave the stored line and verify that the normal search still works.
+        const int line[] = {
+            4 * 8 + 5, 5 * 8 + 5, 5 * 8 + 4, 3 * 8 + 5,
+            2 * 8 + 4, 5 * 8 + 3, 4 * 8 + 2,
+        };
+        Disc turn = Disc::Black;
+        for (const int index : line) {
+            require(
+                board.put(turn, index / 8, index % 8),
+                "Could not build opening-book fallback position"
+            );
+            turn = opposite(turn);
+        }
+        const auto searchedMove = ai.chooseMove(board, turn);
+        require(searchedMove.has_value(), "AI returned no fallback move");
+        require(!searchedMove->openingBook, "Book continued beyond stored line");
+        require(searchedMove->searchedNodes > 0, "Fallback search visited no nodes");
+        require(searchedMove->searchDepth == 3, "Fallback depth is incorrect");
 
         const auto noMove = ai.chooseMove(board, Disc::Empty);
         require(!noMove.has_value(), "AI accepted Disc::Empty");

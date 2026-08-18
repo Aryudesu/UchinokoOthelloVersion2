@@ -34,6 +34,7 @@ class GameScene : public SceneBase {
     bool aiExactSearch_ = false;
     std::uint64_t aiTranspositionHits_ = 0;
     int aiIterations_ = 0;
+    bool aiOpeningBook_ = false;
     Phase phase_ = Phase::PlayerTurn;
     OthelloAI::SearchProgress aiProgress_;
     std::optional<OthelloAI::Move> pendingAiMove_;
