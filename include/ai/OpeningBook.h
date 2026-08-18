@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -23,6 +24,9 @@ public:
 
     [[nodiscard]] std::size_t positionCount() const noexcept {
         return entries_.size();
+    }
+    [[nodiscard]] std::size_t lineCount() const noexcept {
+        return lineCount_;
     }
 
 private:
@@ -46,8 +50,10 @@ private:
     };
 
     std::unordered_map<PositionKey, std::vector<int>, PositionKeyHash> entries_;
+    std::size_t lineCount_ = 0;
 
-    void addLine(const std::vector<int>& moves);
+    [[nodiscard]] bool addNotationLine(std::string_view notation);
+    [[nodiscard]] bool addLine(const std::vector<int>& moves);
     [[nodiscard]] static CanonicalPosition canonicalize(
         const BitBoard& board,
         Disc turn

@@ -38,6 +38,7 @@
     <ClInclude Include="include\util\debug.h" />
     <ClInclude Include="include\ai\OthelloAI.h" />
     <ClInclude Include="include\ai\OpeningBook.h" />
+    <ClInclude Include="include\ai\OpeningBookData.h" />
     <ClInclude Include="include\model\BitBoard.h" />
     <ClInclude Include="include\core\FramePacer.h" />
     <ClInclude Include="include\scene\GameScene.h" />

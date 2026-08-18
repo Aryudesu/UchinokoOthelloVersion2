@@ -89,6 +89,7 @@
     <ClInclude Include="..\include\model\BitBoard.h" />
     <ClInclude Include="..\include\ai\OthelloAI.h" />
     <ClInclude Include="..\include\ai\OpeningBook.h" />
+    <ClInclude Include="..\include\ai\OpeningBookData.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
