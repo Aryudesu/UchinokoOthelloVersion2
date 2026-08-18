@@ -2,6 +2,7 @@
 #include "scene/SceneBase.h"
 #include "core/Ids.h"
 #include "model/BitBoard.h"
+#include "model/MatchResult.h"
 #include "ai/OthelloAI.h"
 #include "view/BoardView.h"
 
@@ -21,6 +22,11 @@ class GameScene : public SceneBase {
         GameOver,
     };
 
+    enum class ResultChoice {
+        Rematch,
+        Title,
+    };
+
     bool end_ = false;
     SceneID next_ = SceneID::Game;
     BitBoard board_;
@@ -30,6 +36,8 @@ class GameScene : public SceneBase {
     Disc passed_ = Disc::Empty;
     bool gameOver_ = false;
     bool mouseLeftDown_ = false;
+    int resultMouseX_ = 0;
+    int resultMouseY_ = 0;
     std::uint64_t aiSearchedNodes_ = 0;
     int aiSearchDepth_ = 0;
     bool aiExactSearch_ = false;
@@ -38,6 +46,7 @@ class GameScene : public SceneBase {
     bool aiOpeningBook_ = false;
     std::string openingName_;
     Phase phase_ = Phase::PlayerTurn;
+    ResultChoice resultChoice_ = ResultChoice::Rematch;
     OthelloAI::SearchProgress aiProgress_;
     std::optional<OthelloAI::Move> pendingAiMove_;
     std::mutex aiResultMutex_;
@@ -45,7 +54,11 @@ class GameScene : public SceneBase {
     std::chrono::steady_clock::time_point aiStartedAt_;
     std::jthread aiThread_;
 
+    void resetMatch();
     void handleBoardClick();
+    void handleResultInput(bool clicked);
+    void applyResultChoice();
+    void drawResult(const MatchResult& result) const;
     void performAiMove();
     void advanceTurn();
     void startAiSearch();
