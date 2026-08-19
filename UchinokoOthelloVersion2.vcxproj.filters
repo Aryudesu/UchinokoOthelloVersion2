@@ -24,6 +24,9 @@
     <ClCompile Include="src\core\FramePacer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\GameSettings.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="src\scene\GameScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -74,6 +77,9 @@
     <ClInclude Include="include\core\FramePacer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="include\core\GameSettings.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="include\scene\GameScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -120,6 +126,9 @@
   <ItemGroup>
     <None Include=".gitignore">
       <Filter>ソース ファイル</Filter>
+    </None>
+    <None Include="data\config\game.ini">
+      <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>
 </Project>
