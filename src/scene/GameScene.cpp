@@ -40,6 +40,10 @@ namespace {
     }
 
 
+    // Keep instant opening-book moves and shallow searches from feeling abrupt.
+    // Searches that take longer than this are applied as soon as they finish.
+    constexpr auto MinimumAiThinkingTime = std::chrono::milliseconds(700);
+
     constexpr int ResultPanelLeft = 180;
     constexpr int ResultPanelTop = 150;
     constexpr int ResultPanelRight = 540;
@@ -95,7 +99,12 @@ void GameScene::Update() {
     mouseLeftDown_ = mouseLeft;
 
     if (phase_ == Phase::AiThinking) {
-        if (aiFinished_.load(std::memory_order_acquire)) finishAiSearch();
+        const bool searchFinished =
+            aiFinished_.load(std::memory_order_acquire);
+        const bool minimumTimeElapsed =
+            std::chrono::steady_clock::now() - aiStartedAt_ >=
+            MinimumAiThinkingTime;
+        if (searchFinished && minimumTimeElapsed) finishAiSearch();
         return;
     }
 
