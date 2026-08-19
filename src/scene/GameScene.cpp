@@ -72,11 +72,13 @@ GameScene::~GameScene() {
 
 void GameScene::Start() {
     boardView_.Start();
+    character_.Start("data/config/character.ini");
     resetMatch();
 }
 
 void GameScene::End() {
     cancelAiSearch();
+    character_.End();
     boardView_.End();
 }
 
@@ -128,6 +130,7 @@ void GameScene::resetMatch() {
     playerDisc_ = settings.playerDisc();
     aiDisc_ = settings.aiDisc();
     aiTurn_.Configure(difficulty);
+    character_.Show(CharacterReaction::Start);
 
     end_ = false;
     next_ = SceneID::Game;
@@ -261,6 +264,7 @@ void GameScene::startAiSearch() {
     if (phase_ == Phase::AiThinking) return;
 
     aiTurn_.Start(board_, aiDisc_);
+    character_.Show(CharacterReaction::Thinking);
     phase_ = Phase::AiThinking;
 }
 
@@ -286,21 +290,58 @@ void GameScene::updateOpeningName() {
 }
 
 void GameScene::advanceTurn() {
+    const Disc movedDisc = turn_;
     const Disc next = opponentOf(turn_);
     passed_ = Disc::Empty;
 
     if (board_.hasAnyMove(next)) {
         turn_ = next;
+        updateCharacterReaction(movedDisc);
         return;
     }
 
     if (board_.hasAnyMove(turn_)) {
         passed_ = next;
+        character_.Show(
+            next == playerDisc_
+                ? CharacterReaction::PlayerPass
+                : CharacterReaction::AiPass
+        );
         return;
     }
 
     gameOver_ = true;
     phase_ = Phase::GameOver;
+
+    const MatchResult result = MatchResult::From(board_);
+    const MatchWinner aiWinner = aiDisc_ == Disc::Black
+        ? MatchWinner::Black
+        : MatchWinner::White;
+    if (result.winner == MatchWinner::Draw) {
+        character_.Show(CharacterReaction::Draw);
+    } else if (result.winner == aiWinner) {
+        character_.Show(CharacterReaction::Win);
+    } else {
+        character_.Show(CharacterReaction::Lose);
+    }
+}
+
+void GameScene::updateCharacterReaction(Disc movedDisc) {
+    constexpr int AdvantageThreshold = 4;
+    const int difference =
+        board_.count(aiDisc_) - board_.count(playerDisc_);
+
+    if (difference >= AdvantageThreshold) {
+        character_.Show(CharacterReaction::Advantage);
+    } else if (difference <= -AdvantageThreshold) {
+        character_.Show(CharacterReaction::Disadvantage);
+    } else {
+        character_.Show(
+            movedDisc == aiDisc_
+                ? CharacterReaction::AiMove
+                : CharacterReaction::PlayerMove
+        );
+    }
 }
 
 void GameScene::Draw() {
@@ -400,6 +441,8 @@ void GameScene::Draw() {
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
         DrawString(32, openingName_.empty() ? 152 : 176, passMessage, noticeColor);
     }
+
+    character_.Draw();
 
     if (gameOver_ && !boardView_.IsAnimating()) {
         drawResult(MatchResult::From(board_));
