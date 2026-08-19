@@ -4,7 +4,6 @@
 #include "util/LoadIni.h"
 #include "DxLib.h"
 
-#include <algorithm>
 
 namespace {
     constexpr float FaceX = 16.0f;
