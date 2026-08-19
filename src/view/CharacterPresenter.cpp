@@ -1,8 +1,12 @@
+#define NOMINMAX
 #include "view/CharacterPresenter.h"
 
 #include "manager/ImageManager.h"
 #include "util/LoadIni.h"
 #include "DxLib.h"
+#include <Windows.h>
+
+#include <string_view>
 
 
 namespace {
@@ -12,6 +16,33 @@ namespace {
     constexpr int MessageTop = 400;
     constexpr int MessageRight = 624;
     constexpr int MessageBottom = 468;
+
+    std::string utf8ToLocal(std::string_view text) {
+        if (text.empty()) return {};
+
+        const int byteCount = static_cast<int>(text.size());
+        const int wideCount = MultiByteToWideChar(
+            CP_UTF8, 0, text.data(), byteCount, nullptr, 0
+        );
+        if (wideCount <= 0) return std::string(text);
+
+        std::wstring wide(static_cast<std::size_t>(wideCount), L'\0');
+        MultiByteToWideChar(
+            CP_UTF8, 0, text.data(), byteCount, wide.data(), wideCount
+        );
+
+        const int localCount = WideCharToMultiByte(
+            CP_ACP, 0, wide.data(), wideCount, nullptr, 0, nullptr, nullptr
+        );
+        if (localCount <= 0) return std::string(text);
+
+        std::string local(static_cast<std::size_t>(localCount), '\0');
+        WideCharToMultiByte(
+            CP_ACP, 0, wide.data(), wideCount,
+            local.data(), localCount, nullptr, nullptr
+        );
+        return local;
+    }
 
     constexpr const char* DefaultImages[] = {
         "data/img/faceNormal.bmp",
@@ -67,11 +98,11 @@ void CharacterPresenter::Start(const std::string& configPath) {
         );
     }
     for (std::size_t i = 0; i < messages_.size(); ++i) {
-        messages_[i] = ini.GetStr(
+        messages_[i] = utf8ToLocal(ini.GetStr(
             "Dialogue",
             MessageKeys[i],
             DefaultMessages[i]
-        );
+        ));
     }
 
     loaded_ = true;
