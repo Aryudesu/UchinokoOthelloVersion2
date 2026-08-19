@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\core\FramePacer.cpp" />
+    <ClCompile Include="src\core\GameSettings.cpp" />
     <ClCompile Include="src\ai\OthelloAI.cpp" />
     <ClCompile Include="src\ai\OpeningBook.cpp" />
     <ClCompile Include="src\model\BitBoard.cpp" />
@@ -42,6 +43,7 @@
     <ClInclude Include="include\model\BitBoard.h" />
     <ClInclude Include="include\model\MatchResult.h" />
     <ClInclude Include="include\core\FramePacer.h" />
+    <ClInclude Include="include\core\GameSettings.h" />
     <ClInclude Include="include\scene\GameScene.h" />
     <ClInclude Include="include\animation\SpriteAnimator.h" />
     <ClInclude Include="include\view\BoardView.h" />
@@ -60,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="data\config\game.ini" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

@@ -6,6 +6,7 @@
 class TitleScene : public SceneBase {
     bool end_ = false;
     SceneID next_ = SceneID::Title;
+    int selectedRow_ = 0;
 
 public:
     void Start() override;

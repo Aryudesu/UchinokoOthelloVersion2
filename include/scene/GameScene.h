@@ -33,6 +33,8 @@ class GameScene : public SceneBase {
     BitBoard board_;
     BoardView boardView_;
     OthelloAI ai_{ 5 };
+    Disc playerDisc_ = Disc::Black;
+    Disc aiDisc_ = Disc::White;
     Disc turn_ = Disc::Black;
     Disc passed_ = Disc::Empty;
     bool gameOver_ = false;
@@ -54,6 +56,9 @@ class GameScene : public SceneBase {
     std::atomic<bool> aiFinished_{ false };
     std::mt19937 aiDelayRandom_{ std::random_device{}() };
     std::chrono::milliseconds aiMinimumThinkingTime_{ 700 };
+    int aiMinimumThinkingMs_ = 600;
+    int aiMaximumThinkingMs_ = 800;
+    std::chrono::milliseconds aiSearchTimeLimit_{ 10'000 };
     bool aiTimeoutRequested_ = false;
     std::chrono::steady_clock::time_point aiStartedAt_;
     std::jthread aiThread_;
