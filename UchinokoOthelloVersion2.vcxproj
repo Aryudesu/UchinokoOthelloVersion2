@@ -27,6 +27,7 @@
     <ClCompile Include="src\model\BitBoard.cpp" />
     <ClCompile Include="src\scene\GameScene.cpp" />
     <ClCompile Include="src\view\BoardView.cpp" />
+    <ClCompile Include="src\view\CharacterPresenter.cpp" />
     <ClCompile Include="src\manager\ImageManager.cpp" />
     <ClCompile Include="src\util\DebugOverlay.cpp" />
     <ClCompile Include="src\util\Dialog.cpp" />
@@ -49,6 +50,7 @@
     <ClInclude Include="include\scene\GameScene.h" />
     <ClInclude Include="include\animation\SpriteAnimator.h" />
     <ClInclude Include="include\view\BoardView.h" />
+    <ClInclude Include="include\view\CharacterPresenter.h" />
     <ClInclude Include="include\core\Ids.h" />
     <ClInclude Include="include\manager\ImageManager.h" />
     <ClInclude Include="include\manager\InputManager.h" />
@@ -65,6 +67,7 @@
   <ItemGroup>
     <None Include=".gitignore" />
     <None Include="data\config\game.ini" />
+    <None Include="data\config\character.ini" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
