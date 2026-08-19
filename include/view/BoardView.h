@@ -41,14 +41,17 @@ public:
     }
 
 private:
-    // stone.bmp indices. Keeping these names here makes a future 9/10 swap local.
+    // stone.bmp indices.
     static constexpr int StoneEmpty = 0;
     static constexpr int StoneBlack = 1;
     static constexpr int StoneWhite = 2;
     static constexpr int StoneBlackToWhiteFirst = 3;
     static constexpr int StoneWhiteToBlackFirst = 6;
-    static constexpr int StoneLegalMove = 9;
-    static constexpr int StoneLastMove = 10;
+
+    // mark.bmp indices.
+    static constexpr int MarkLegalMove = 0;
+    static constexpr int MarkLastMove = 1;
+    static constexpr int MarkMousePointer = 2;
 
     static constexpr int BoardFrameCount = 12;
     static constexpr int BoardFrameDurationMs = 270;
