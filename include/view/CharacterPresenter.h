@@ -3,6 +3,7 @@
 #include "core/Ids.h"
 
 #include <array>
+#include <cstddef>
 #include <string>
 
 enum class CharacterReaction {
