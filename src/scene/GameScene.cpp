@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "scene/GameScene.h"
+#include "core/GameSettings.h"
 #include "manager/InputManager.h"
 #include "DxLib.h"
 #include <Windows.h>
@@ -39,10 +40,6 @@ namespace {
         return local;
     }
 
-
-    constexpr int MinimumAiThinkingMs = 600;
-    constexpr int MaximumAiThinkingMs = 800;
-    constexpr auto AiSearchTimeLimit = std::chrono::seconds(10);
 
     constexpr int ResultPanelLeft = 180;
     constexpr int ResultPanelTop = 150;
@@ -105,7 +102,7 @@ void GameScene::Update() {
         if (
             !aiFinished_.load(std::memory_order_acquire) &&
             !aiTimeoutRequested_ &&
-            elapsed >= AiSearchTimeLimit
+            elapsed >= aiSearchTimeLimit_
         ) {
             aiTimeoutRequested_ = true;
             if (aiThread_.joinable()) aiThread_.request_stop();
@@ -128,7 +125,7 @@ void GameScene::Update() {
         return;
     }
 
-    if (turn_ == Disc::White) {
+    if (turn_ == aiDisc_) {
         startAiSearch();
         return;
     }
@@ -140,6 +137,17 @@ void GameScene::Update() {
 
 void GameScene::resetMatch() {
     cancelAiSearch();
+
+    const auto& settings = GameSettings::GetInstance();
+    const DifficultyProfile& difficulty = settings.difficulty();
+    playerDisc_ = settings.playerDisc();
+    aiDisc_ = settings.aiDisc();
+    ai_.setDepth(difficulty.searchDepth);
+    ai_.setExactEndgameEmpty(difficulty.exactEndgameEmpty);
+    aiMinimumThinkingMs_ = difficulty.minimumThinkingMs;
+    aiMaximumThinkingMs_ = difficulty.maximumThinkingMs;
+    aiSearchTimeLimit_ =
+        std::chrono::milliseconds(difficulty.timeLimitMs);
 
     end_ = false;
     next_ = SceneID::Game;
@@ -158,7 +166,9 @@ void GameScene::resetMatch() {
     aiOpeningBook_ = false;
     openingName_.clear();
     resultChoice_ = ResultChoice::Rematch;
-    phase_ = Phase::PlayerTurn;
+    phase_ = turn_ == playerDisc_
+        ? Phase::PlayerTurn
+        : Phase::ApplyingAiMove;
     aiProgress_.reset(0, false);
     aiFinished_.store(false, std::memory_order_relaxed);
 }
@@ -233,8 +243,8 @@ void GameScene::handleBoardClick() {
     if (!boardView_.HitTest(mouseX, mouseY, row, col)) return;
 
     const BitBoard before = board_;
-    if (board_.put(Disc::Black, row, col)) {
-        boardView_.BeginMove(before, board_, Disc::Black, row, col);
+    if (board_.put(playerDisc_, row, col)) {
+        boardView_.BeginMove(before, board_, playerDisc_, row, col);
         updateOpeningName();
         advanceTurn();
     }
@@ -253,11 +263,11 @@ void GameScene::performAiMove() {
     }
 
     const BitBoard before = board_;
-    if (board_.put(Disc::White, move->row, move->col)) {
+    if (board_.put(aiDisc_, move->row, move->col)) {
         boardView_.BeginMove(
             before,
             board_,
-            Disc::White,
+            aiDisc_,
             move->row,
             move->col
         );
@@ -281,8 +291,8 @@ void GameScene::startAiSearch() {
     aiFinished_.store(false, std::memory_order_relaxed);
     aiTimeoutRequested_ = false;
     std::uniform_int_distribution<int> delayDistribution(
-        MinimumAiThinkingMs,
-        MaximumAiThinkingMs
+        aiMinimumThinkingMs_,
+        aiMaximumThinkingMs_
     );
     aiMinimumThinkingTime_ = std::chrono::milliseconds(
         delayDistribution(aiDelayRandom_)
@@ -293,7 +303,7 @@ void GameScene::startAiSearch() {
     aiThread_ = std::jthread(
         [this, boardSnapshot](std::stop_token stopToken) {
             auto result = ai_.chooseMove(
-                boardSnapshot, Disc::White, stopToken, &aiProgress_
+                boardSnapshot, aiDisc_, stopToken, &aiProgress_
             );
             {
                 std::lock_guard lock(aiResultMutex_);
@@ -309,7 +319,7 @@ void GameScene::finishAiSearch() {
     phase_ = Phase::ApplyingAiMove;
     performAiMove();
     if (!gameOver_) {
-        phase_ = turn_ == Disc::White
+        phase_ = turn_ == aiDisc_
             ? Phase::ApplyingAiMove
             : Phase::PlayerTurn;
     }
@@ -355,8 +365,8 @@ void GameScene::Draw() {
     const int noticeColor = GetColor(255, 220, 80);
 
     const BitBoard::Bits legalMoves =
-        !gameOver_ && turn_ == Disc::Black
-        ? board_.legalMoves(Disc::Black)
+        !gameOver_ && turn_ == playerDisc_
+        ? board_.legalMoves(playerDisc_)
         : 0;
 
     boardView_.Draw(
@@ -367,15 +377,24 @@ void GameScene::Draw() {
 
     const int blackCount = board_.count(Disc::Black);
     const int whiteCount = board_.count(Disc::White);
+    const int playerCount = board_.count(playerDisc_);
+    const int aiCount = board_.count(aiDisc_);
 
-    char score[64];
-    std::snprintf(score, sizeof(score), "You (Black): %d  AI (White): %d", blackCount, whiteCount);
+    char score[80];
+    std::snprintf(
+        score, sizeof(score),
+        "You (%s): %d  AI (%s): %d",
+        discName(playerDisc_),
+        playerCount,
+        discName(aiDisc_),
+        aiCount
+    );
 
     char status[64];
     if (gameOver_) {
-        if (blackCount > whiteCount) {
+        if (playerCount > aiCount) {
             std::snprintf(status, sizeof(status), "Game Over: You win");
-        } else if (whiteCount > blackCount) {
+        } else if (aiCount > playerCount) {
             std::snprintf(status, sizeof(status), "Game Over: AI wins");
         } else {
             std::snprintf(status, sizeof(status), "Game Over: Draw");
@@ -461,9 +480,16 @@ void GameScene::drawResult(const MatchResult& result) const {
     );
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
+    const MatchWinner playerWinner = playerDisc_ == Disc::Black
+        ? MatchWinner::Black
+        : MatchWinner::White;
+    const MatchWinner aiWinner = aiDisc_ == Disc::Black
+        ? MatchWinner::Black
+        : MatchWinner::White;
+
     const char* headline = "DRAW";
-    if (result.winner == MatchWinner::Black) headline = "YOU WIN!";
-    if (result.winner == MatchWinner::White) headline = "AI WINS";
+    if (result.winner == playerWinner) headline = "YOU WIN!";
+    if (result.winner == aiWinner) headline = "AI WINS";
     DrawString(310, 175, headline, accent);
 
     char finalScore[64];
