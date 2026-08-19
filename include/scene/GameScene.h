@@ -3,16 +3,11 @@
 #include "core/Ids.h"
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
-#include "ai/OthelloAI.h"
+#include "ai/AiTurnController.h"
 #include "view/BoardView.h"
 
 #include <cstdint>
-#include <atomic>
-#include <chrono>
-#include <mutex>
 #include <optional>
-#include <random>
-#include <thread>
 #include <string>
 
 class GameScene : public SceneBase {
@@ -32,7 +27,7 @@ class GameScene : public SceneBase {
     SceneID next_ = SceneID::Game;
     BitBoard board_;
     BoardView boardView_;
-    OthelloAI ai_{ 5 };
+    AiTurnController aiTurn_;
     Disc playerDisc_ = Disc::Black;
     Disc aiDisc_ = Disc::White;
     Disc turn_ = Disc::Black;
@@ -50,25 +45,13 @@ class GameScene : public SceneBase {
     std::string openingName_;
     Phase phase_ = Phase::PlayerTurn;
     ResultChoice resultChoice_ = ResultChoice::Rematch;
-    OthelloAI::SearchProgress aiProgress_;
-    std::optional<OthelloAI::Move> pendingAiMove_;
-    std::mutex aiResultMutex_;
-    std::atomic<bool> aiFinished_{ false };
-    std::mt19937 aiDelayRandom_{ std::random_device{}() };
-    std::chrono::milliseconds aiMinimumThinkingTime_{ 700 };
-    int aiMinimumThinkingMs_ = 600;
-    int aiMaximumThinkingMs_ = 800;
-    std::chrono::milliseconds aiSearchTimeLimit_{ 10'000 };
-    bool aiTimeoutRequested_ = false;
-    std::chrono::steady_clock::time_point aiStartedAt_;
-    std::jthread aiThread_;
 
     void resetMatch();
     void handleBoardClick();
     void handleResultInput(bool clicked);
     void applyResultChoice();
     void drawResult(const MatchResult& result) const;
-    void performAiMove();
+    void performAiMove(std::optional<OthelloAI::Move> move);
     void advanceTurn();
     void startAiSearch();
     void finishAiSearch();

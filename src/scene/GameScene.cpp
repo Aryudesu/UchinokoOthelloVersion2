@@ -96,23 +96,8 @@ void GameScene::Update() {
     mouseLeftDown_ = mouseLeft;
 
     if (phase_ == Phase::AiThinking) {
-        const auto elapsed =
-            std::chrono::steady_clock::now() - aiStartedAt_;
-
-        if (
-            !aiFinished_.load(std::memory_order_acquire) &&
-            !aiTimeoutRequested_ &&
-            elapsed >= aiSearchTimeLimit_
-        ) {
-            aiTimeoutRequested_ = true;
-            if (aiThread_.joinable()) aiThread_.request_stop();
-        }
-
-        const bool searchFinished =
-            aiFinished_.load(std::memory_order_acquire);
-        const bool minimumTimeElapsed =
-            elapsed >= aiMinimumThinkingTime_;
-        if (searchFinished && minimumTimeElapsed) finishAiSearch();
+        aiTurn_.Update();
+        if (aiTurn_.HasCompleted()) finishAiSearch();
         return;
     }
 
@@ -142,12 +127,7 @@ void GameScene::resetMatch() {
     const DifficultyProfile& difficulty = settings.difficulty();
     playerDisc_ = settings.playerDisc();
     aiDisc_ = settings.aiDisc();
-    ai_.setDepth(difficulty.searchDepth);
-    ai_.setExactEndgameEmpty(difficulty.exactEndgameEmpty);
-    aiMinimumThinkingMs_ = difficulty.minimumThinkingMs;
-    aiMaximumThinkingMs_ = difficulty.maximumThinkingMs;
-    aiSearchTimeLimit_ =
-        std::chrono::milliseconds(difficulty.timeLimitMs);
+    aiTurn_.Configure(difficulty);
 
     end_ = false;
     next_ = SceneID::Game;
@@ -169,8 +149,7 @@ void GameScene::resetMatch() {
     phase_ = turn_ == playerDisc_
         ? Phase::PlayerTurn
         : Phase::ApplyingAiMove;
-    aiProgress_.reset(0, false);
-    aiFinished_.store(false, std::memory_order_relaxed);
+
 }
 
 void GameScene::handleResultInput(bool clicked) {
@@ -250,13 +229,9 @@ void GameScene::handleBoardClick() {
     }
 }
 
-void GameScene::performAiMove() {
-    std::optional<OthelloAI::Move> move;
-    {
-        std::lock_guard lock(aiResultMutex_);
-        move = std::move(pendingAiMove_);
-        pendingAiMove_.reset();
-    }
+void GameScene::performAiMove(
+    std::optional<OthelloAI::Move> move
+) {
     if (!move.has_value()) {
         advanceTurn();
         return;
@@ -285,39 +260,13 @@ void GameScene::performAiMove() {
 void GameScene::startAiSearch() {
     if (phase_ == Phase::AiThinking) return;
 
-    cancelAiSearch();
-    const BitBoard boardSnapshot = board_;
-    aiProgress_.reset(0, false);
-    aiFinished_.store(false, std::memory_order_relaxed);
-    aiTimeoutRequested_ = false;
-    std::uniform_int_distribution<int> delayDistribution(
-        aiMinimumThinkingMs_,
-        aiMaximumThinkingMs_
-    );
-    aiMinimumThinkingTime_ = std::chrono::milliseconds(
-        delayDistribution(aiDelayRandom_)
-    );
-    aiStartedAt_ = std::chrono::steady_clock::now();
+    aiTurn_.Start(board_, aiDisc_);
     phase_ = Phase::AiThinking;
-
-    aiThread_ = std::jthread(
-        [this, boardSnapshot](std::stop_token stopToken) {
-            auto result = ai_.chooseMove(
-                boardSnapshot, aiDisc_, stopToken, &aiProgress_
-            );
-            {
-                std::lock_guard lock(aiResultMutex_);
-                pendingAiMove_ = std::move(result);
-            }
-            aiFinished_.store(true, std::memory_order_release);
-        }
-    );
 }
 
 void GameScene::finishAiSearch() {
-    if (aiThread_.joinable()) aiThread_.join();
     phase_ = Phase::ApplyingAiMove;
-    performAiMove();
+    performAiMove(aiTurn_.TakeMove());
     if (!gameOver_) {
         phase_ = turn_ == aiDisc_
             ? Phase::ApplyingAiMove
@@ -326,19 +275,13 @@ void GameScene::finishAiSearch() {
 }
 
 void GameScene::cancelAiSearch() {
-    if (aiThread_.joinable()) {
-        aiThread_.request_stop();
-        aiThread_.join();
-    }
-    aiFinished_.store(false, std::memory_order_relaxed);
-    std::lock_guard lock(aiResultMutex_);
-    pendingAiMove_.reset();
+    aiTurn_.Cancel();
 }
 
 void GameScene::updateOpeningName() {
     const Disc nextTurn = opponentOf(turn_);
     const std::u8string_view name =
-        ai_.completedOpeningName(board_, nextTurn);
+        aiTurn_.CompletedOpeningName(board_, nextTurn);
     if (!name.empty()) openingName_ = utf8ToLocal(name);
 }
 
@@ -400,9 +343,7 @@ void GameScene::Draw() {
             std::snprintf(status, sizeof(status), "Game Over: Draw");
         }
     } else if (phase_ == Phase::AiThinking) {
-        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - aiStartedAt_
-        ).count();
+        const auto elapsed = aiTurn_.ElapsedMilliseconds();
         const int dots = static_cast<int>((elapsed / 300) % 4);
         std::snprintf(status, sizeof(status), "AI is thinking%.*s", dots, "...");
     } else if (boardView_.IsAnimating()) {
@@ -414,19 +355,19 @@ void GameScene::Draw() {
     char aiInfo[128];
     const bool thinking = phase_ == Phase::AiThinking;
     const int displayDepth = thinking
-        ? aiProgress_.completedDepth.load(std::memory_order_relaxed)
+        ? aiTurn_.Progress().completedDepth.load(std::memory_order_relaxed)
         : aiSearchDepth_;
     const int targetDepth = thinking
-        ? aiProgress_.targetDepth.load(std::memory_order_relaxed)
+        ? aiTurn_.Progress().targetDepth.load(std::memory_order_relaxed)
         : aiSearchDepth_;
     const auto displayNodes = thinking
-        ? aiProgress_.searchedNodes.load(std::memory_order_relaxed)
+        ? aiTurn_.Progress().searchedNodes.load(std::memory_order_relaxed)
         : aiSearchedNodes_;
     const auto displayHits = thinking
-        ? aiProgress_.transpositionHits.load(std::memory_order_relaxed)
+        ? aiTurn_.Progress().transpositionHits.load(std::memory_order_relaxed)
         : aiTranspositionHits_;
     const bool displayExact = thinking
-        ? aiProgress_.exactSearch.load(std::memory_order_relaxed)
+        ? aiTurn_.Progress().exactSearch.load(std::memory_order_relaxed)
         : aiExactSearch_;
     if (!thinking && aiOpeningBook_) {
         std::snprintf(aiInfo, sizeof(aiInfo), "AI: OPENING BOOK");
@@ -436,7 +377,7 @@ void GameScene::Draw() {
             sizeof(aiInfo),
             "AI depth: %d/%d  Nodes: %llu  TT: %llu%s",
             displayDepth,
-            targetDepth > 0 ? targetDepth : ai_.depth(),
+            targetDepth > 0 ? targetDepth : aiTurn_.ConfiguredDepth(),
             static_cast<unsigned long long>(displayNodes),
             static_cast<unsigned long long>(displayHits),
             displayExact ? "  EXACT" : ""

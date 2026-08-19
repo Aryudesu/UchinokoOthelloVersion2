@@ -1,7 +1,8 @@
 #include "ai/OthelloAI.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
-#include "model/BitBoard.h"\n#include "model/MatchResult.h"
+#include "model/BitBoard.h"
+#include "model/MatchResult.h"
 
 #include <bit>
 #include <cstdint>
