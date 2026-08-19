@@ -17,6 +17,7 @@ enum class CharacterReaction {
     Draw,
     PlayerPass,
     AiPass,
+    Count,
 };
 
 class CharacterPresenter {
@@ -38,9 +39,11 @@ private:
 
     static constexpr std::size_t ExpressionCount =
         static_cast<std::size_t>(Expression::Count);
+    static constexpr std::size_t ReactionCount =
+        static_cast<std::size_t>(CharacterReaction::Count);
 
     std::array<std::string, ExpressionCount> imagePaths_{};
-    std::array<std::string, 11> messages_{};
+    std::array<std::string, ReactionCount> messages_{};
     Expression expression_ = Expression::Normal;
     std::string message_;
     bool loaded_ = false;
