@@ -8,6 +8,8 @@
 enum class CharacterReaction {
     Start,
     Thinking,
+    PlayerMove,
+    AiMove,
     Advantage,
     Disadvantage,
     Win,
@@ -38,7 +40,7 @@ private:
         static_cast<std::size_t>(Expression::Count);
 
     std::array<std::string, ExpressionCount> imagePaths_{};
-    std::array<std::string, 9> messages_{};
+    std::array<std::string, 11> messages_{};
     Expression expression_ = Expression::Normal;
     std::string message_;
     bool loaded_ = false;
