@@ -34,6 +34,12 @@ GameSettings& GameSettings::GetInstance() {
 }
 
 void GameSettings::Load(const std::string& path) {
+    profiles_ = { {
+        { "EASY", 3, 8, 3'000, 600, 800 },
+        { "NORMAL", 5, 14, 10'000, 600, 800 },
+        { "HARD", 10, 16, 10'000, 600, 800 },
+    } };
+
     INIDat ini(path);
 
     for (std::size_t i = 0; i < profiles_.size(); ++i) {
