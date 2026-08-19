@@ -11,6 +11,7 @@
 #include <chrono>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <thread>
 #include <string>
 
@@ -51,6 +52,9 @@ class GameScene : public SceneBase {
     std::optional<OthelloAI::Move> pendingAiMove_;
     std::mutex aiResultMutex_;
     std::atomic<bool> aiFinished_{ false };
+    std::mt19937 aiDelayRandom_{ std::random_device{}() };
+    std::chrono::milliseconds aiMinimumThinkingTime_{ 700 };
+    bool aiTimeoutRequested_ = false;
     std::chrono::steady_clock::time_point aiStartedAt_;
     std::jthread aiThread_;
 

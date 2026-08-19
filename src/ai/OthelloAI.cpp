@@ -105,7 +105,17 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     } catch (const SearchCancelled&) {
         publishProgress();
         progress_ = nullptr;
-        return std::nullopt;
+
+        // Iterative deepening keeps the result of the last fully completed
+        // depth. A time limit can therefore stop the current iteration
+        // without discarding all useful work.
+        if (bestMove.row < 0) return std::nullopt;
+
+        bestMove.searchedNodes = searchedNodes_;
+        bestMove.searchDepth = bestMove.completedIterations;
+        bestMove.exactSearch = false;
+        bestMove.transpositionHits = transpositionHits_;
+        return bestMove;
     }
 
     bestMove.searchedNodes = searchedNodes_;
