@@ -6,6 +6,7 @@ enum class ImageID : int {
     Enemy,
     Item,
     Stone,
+    Mark,
     Board,
     Frame,
     Count,

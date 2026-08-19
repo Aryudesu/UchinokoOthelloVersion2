@@ -6,7 +6,9 @@
 
 namespace {
     constexpr int SheetColumns = 3;
-    constexpr int SheetRows = 4;
+    constexpr int BoardAndFrameRows = 4;
+    constexpr int StoneRows = 3;
+    constexpr int MarkRows = 1;
     constexpr int SheetFrameSize = 40;
 
     constexpr int FrameTopLeft = 0;
@@ -27,7 +29,7 @@ void BoardView::Start() {
         SheetFrameSize,
         SheetFrameSize,
         SheetColumns,
-        SheetRows,
+        BoardAndFrameRows,
         "data/img/board.bmp"
     );
 
@@ -37,7 +39,7 @@ void BoardView::Start() {
         SheetFrameSize,
         SheetFrameSize,
         SheetColumns,
-        SheetRows,
+        BoardAndFrameRows,
         "data/img/frame.bmp"
     );
 
@@ -47,8 +49,18 @@ void BoardView::Start() {
         SheetFrameSize,
         SheetFrameSize,
         SheetColumns,
-        SheetRows,
+        StoneRows,
         "data/img/stone.bmp"
+    );
+
+    images.SetTrans(163, 73, 164);
+    images.LoadDiv(
+        ImageID::Mark,
+        SheetFrameSize,
+        SheetFrameSize,
+        SheetColumns,
+        MarkRows,
+        "data/img/mark.bmp"
     );
 
     boardAnimator_.Play(
@@ -63,6 +75,7 @@ void BoardView::End() {
 
     auto& images = ImageManager::GetInstance();
     images.Destroy(ImageID::Stone);
+    images.Destroy(ImageID::Mark);
     images.Destroy(ImageID::Board);
     images.Destroy(ImageID::Frame);
 
@@ -169,16 +182,34 @@ void BoardView::Draw(
             const int stoneFrame = stoneFrameAt(board, row, col);
             if (stoneFrame != StoneEmpty) {
                 images.Draw(x, y, ImageID::Stone, stoneFrame);
-            } else if (
+            }
+
+            if (
                 showLegalMoves &&
                 (legalMoves & BitBoard::bitAt(row, col)) != 0
             ) {
-                images.Draw(x, y, ImageID::Stone, StoneLegalMove);
+                images.Draw(x, y, ImageID::Mark, MarkLegalMove);
             }
 
             if (row == lastMoveRow_ && col == lastMoveCol_) {
-                images.Draw(x, y, ImageID::Stone, StoneLastMove);
+                images.Draw(x, y, ImageID::Mark, MarkLastMove);
             }
+        }
+    }
+
+    if (showLegalMoves) {
+        int mouseX = 0;
+        int mouseY = 0;
+        int hoverRow = 0;
+        int hoverCol = 0;
+        GetMousePoint(&mouseX, &mouseY);
+        if (HitTest(mouseX, mouseY, hoverRow, hoverCol)) {
+            images.Draw(
+                static_cast<float>(BoardLeft + hoverCol * CellSize),
+                static_cast<float>(BoardTop + hoverRow * CellSize),
+                ImageID::Mark,
+                MarkMousePointer
+            );
         }
     }
 
