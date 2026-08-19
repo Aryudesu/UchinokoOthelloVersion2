@@ -40,9 +40,9 @@ namespace {
     }
 
 
-    // Keep instant opening-book moves and shallow searches from feeling abrupt.
-    // Searches that take longer than this are applied as soon as they finish.
-    constexpr auto MinimumAiThinkingTime = std::chrono::milliseconds(700);
+    constexpr int MinimumAiThinkingMs = 600;
+    constexpr int MaximumAiThinkingMs = 800;
+    constexpr auto AiSearchTimeLimit = std::chrono::seconds(10);
 
     constexpr int ResultPanelLeft = 180;
     constexpr int ResultPanelTop = 150;
@@ -99,11 +99,22 @@ void GameScene::Update() {
     mouseLeftDown_ = mouseLeft;
 
     if (phase_ == Phase::AiThinking) {
+        const auto elapsed =
+            std::chrono::steady_clock::now() - aiStartedAt_;
+
+        if (
+            !aiFinished_.load(std::memory_order_acquire) &&
+            !aiTimeoutRequested_ &&
+            elapsed >= AiSearchTimeLimit
+        ) {
+            aiTimeoutRequested_ = true;
+            if (aiThread_.joinable()) aiThread_.request_stop();
+        }
+
         const bool searchFinished =
             aiFinished_.load(std::memory_order_acquire);
         const bool minimumTimeElapsed =
-            std::chrono::steady_clock::now() - aiStartedAt_ >=
-            MinimumAiThinkingTime;
+            elapsed >= aiMinimumThinkingTime_;
         if (searchFinished && minimumTimeElapsed) finishAiSearch();
         return;
     }
@@ -268,6 +279,14 @@ void GameScene::startAiSearch() {
     const BitBoard boardSnapshot = board_;
     aiProgress_.reset(0, false);
     aiFinished_.store(false, std::memory_order_relaxed);
+    aiTimeoutRequested_ = false;
+    std::uniform_int_distribution<int> delayDistribution(
+        MinimumAiThinkingMs,
+        MaximumAiThinkingMs
+    );
+    aiMinimumThinkingTime_ = std::chrono::milliseconds(
+        delayDistribution(aiDelayRandom_)
+    );
     aiStartedAt_ = std::chrono::steady_clock::now();
     phase_ = Phase::AiThinking;
 
@@ -276,7 +295,7 @@ void GameScene::startAiSearch() {
             auto result = ai_.chooseMove(
                 boardSnapshot, Disc::White, stopToken, &aiProgress_
             );
-            if (!stopToken.stop_requested()) {
+            {
                 std::lock_guard lock(aiResultMutex_);
                 pendingAiMove_ = std::move(result);
             }
