@@ -31,6 +31,8 @@ namespace {
     constexpr const char* MessageKeys[] = {
         "start",
         "thinking",
+        "player_move",
+        "ai_move",
         "advantage",
         "disadvantage",
         "win",
@@ -43,6 +45,8 @@ namespace {
     constexpr const char* DefaultMessages[] = {
         "Let's have a good game!",
         "Hmm... let me think.",
+        "That was a good move.",
+        "I will play here!",
         "I'm in a good position!",
         "This is getting difficult...",
         "I won! Let's play again.",
