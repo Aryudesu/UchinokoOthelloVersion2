@@ -19,16 +19,16 @@ namespace {
     }
 
 
-    constexpr int ResultPanelLeft = 180;
-    constexpr int ResultPanelTop = 150;
-    constexpr int ResultPanelRight = 540;
-    constexpr int ResultPanelBottom = 350;
-    constexpr int RematchLeft = 220;
-    constexpr int RematchRight = 340;
-    constexpr int TitleLeft = 380;
-    constexpr int TitleRight = 500;
-    constexpr int ButtonTop = 295;
-    constexpr int ButtonBottom = 330;
+    constexpr int ResultPanelLeft = 270;
+    constexpr int ResultPanelTop = 210;
+    constexpr int ResultPanelRight = 690;
+    constexpr int ResultPanelBottom = 480;
+    constexpr int RematchLeft = 320;
+    constexpr int RematchRight = 460;
+    constexpr int TitleLeft = 500;
+    constexpr int TitleRight = 640;
+    constexpr int ButtonTop = 415;
+    constexpr int ButtonBottom = 455;
 
     bool insideRect(
         int x, int y,
@@ -408,19 +408,24 @@ void GameScene::Draw() {
 
     DrawString(32, 32, "Othello vs AI", whiteColor);
     DrawString(32, 56, "Click a legal move / ESC : Back to Title", whiteColor);
-    DrawString(32, 80, score, whiteColor);
-    DrawString(32, 104, status, gameOver_ ? noticeColor : whiteColor);
-    DrawString(32, 128, aiInfo, whiteColor);
+    DrawString(520, 432, score, whiteColor);
+    DrawString(520, 456, status, gameOver_ ? noticeColor : whiteColor);
+    DrawString(520, 480, aiInfo, whiteColor);
 
     if (!openingName_.empty()) {
         const std::string openingInfo = "Opening: " + openingName_;
-        DrawString(32, 152, openingInfo.c_str(), noticeColor);
+        DrawString(520, 504, openingInfo.c_str(), noticeColor);
     }
 
     if (passed_ != Disc::Empty) {
         char passMessage[64];
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
-        DrawString(32, openingName_.empty() ? 152 : 176, passMessage, noticeColor);
+        DrawString(
+            520,
+            openingName_.empty() ? 504 : 528,
+            passMessage,
+            noticeColor
+        );
     }
 
     character_.Draw();
@@ -455,7 +460,7 @@ void GameScene::drawResult(const MatchResult& result) const {
     const char* headline = "DRAW";
     if (result.winner == playerWinner) headline = "YOU WIN!";
     if (result.winner == aiWinner) headline = "AI WINS";
-    DrawString(310, 175, headline, accent);
+    DrawString(430, 245, headline, accent);
 
     char finalScore[64];
     std::snprintf(
@@ -463,7 +468,7 @@ void GameScene::drawResult(const MatchResult& result) const {
         "BLACK %d  -  %d WHITE",
         result.blackCount, result.whiteCount
     );
-    DrawString(270, 210, finalScore, white);
+    DrawString(370, 285, finalScore, white);
 
     char difference[64];
     std::snprintf(
@@ -473,8 +478,8 @@ void GameScene::drawResult(const MatchResult& result) const {
             : "DIFFERENCE: %d",
         result.difference
     );
-    DrawString(300, 240, difference, white);
-    DrawString(260, 268, "Select with mouse or arrow keys", white);
+    DrawString(410, 320, difference, white);
+    DrawString(350, 355, "Select with mouse or arrow keys", white);
 
     DrawBox(
         RematchLeft, ButtonTop, RematchRight, ButtonBottom,
@@ -486,8 +491,8 @@ void GameScene::drawResult(const MatchResult& result) const {
         resultChoice_ == ResultChoice::Title ? selected : idle,
         TRUE
     );
-    DrawString(246, 305, "REMATCH", white);
-    DrawString(420, 305, "TITLE", white);
+    DrawString(352, 427, "REMATCH", white);
+    DrawString(548, 427, "TITLE", white);
 }
 
 bool GameScene::IsEnd() const {
