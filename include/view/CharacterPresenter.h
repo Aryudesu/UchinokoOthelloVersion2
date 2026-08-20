@@ -46,6 +46,7 @@ private:
     std::array<int, ExpressionCount> expressionRows_{ { 0, 9, 5, 10 } };
     std::array<std::string, ReactionCount> messages_{};
     Expression expression_ = Expression::Normal;
+    CharacterReaction reaction_ = CharacterReaction::Start;
     bool loaded_ = false;
 
     [[nodiscard]] static Expression expressionFor(
