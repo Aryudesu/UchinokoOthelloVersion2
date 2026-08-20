@@ -7,8 +7,15 @@
 #include <algorithm>
 
 namespace {
-    constexpr float FaceX = 8.0f;
-    constexpr float FaceY = 208.0f;
+    constexpr int FacePanelLeft = 4;
+    constexpr int FacePanelTop = 196;
+    constexpr int FacePanelRight = 204;
+    constexpr int FacePanelBottom = 400;
+    constexpr int FaceInset = 4;
+    constexpr float FaceX =
+        static_cast<float>(FacePanelLeft + FaceInset);
+    constexpr float FaceY =
+        static_cast<float>(FacePanelTop + FaceInset);
     constexpr int FaceFrameSize = 192;
     constexpr int AnimationFrames = 16;
     constexpr int ExpressionRows = 15;
@@ -138,6 +145,43 @@ void CharacterPresenter::Draw() const {
         expressionRow * AnimationFrames + animationFrame;
 
     auto& images = ImageManager::GetInstance();
+
+    const int frameDark = GetColor(92, 42, 12);
+    const int frameGold = GetColor(224, 145, 18);
+    const int faceBackground = GetColor(255, 255, 255);
+
+    DrawBox(
+        FacePanelLeft,
+        FacePanelTop,
+        FacePanelRight,
+        FacePanelBottom,
+        frameDark,
+        TRUE
+    );
+    DrawBox(
+        FacePanelLeft + 2,
+        FacePanelTop + 2,
+        FacePanelRight - 2,
+        FacePanelBottom - 2,
+        frameGold,
+        FALSE
+    );
+    DrawBox(
+        FacePanelLeft + FaceInset,
+        FacePanelTop + FaceInset,
+        FacePanelRight - FaceInset,
+        FacePanelBottom - FaceInset,
+        faceBackground,
+        TRUE
+    );
+    DrawBox(
+        FacePanelLeft + FaceInset,
+        FacePanelTop + FaceInset,
+        FacePanelRight - FaceInset,
+        FacePanelBottom - FaceInset,
+        frameDark,
+        FALSE
+    );
     images.Draw(FaceX, FaceY, ImageID::MainChara, imageIndex);
 
     const int panel = GetColor(20, 24, 36);
