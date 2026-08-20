@@ -23,7 +23,7 @@ enum class CharacterReaction {
 
 class CharacterPresenter {
 public:
-    void Start(const std::string& configPath);
+    void Start(const std::string& configPath, int difficultyIndex);
     void End();
 
     void Show(CharacterReaction reaction);
@@ -43,13 +43,11 @@ private:
     static constexpr std::size_t ReactionCount =
         static_cast<std::size_t>(CharacterReaction::Count);
 
-    std::array<std::string, ExpressionCount> imagePaths_{};
+    std::array<int, ExpressionCount> expressionRows_{ { 0, 9, 5, 10 } };
     std::array<std::string, ReactionCount> messages_{};
     Expression expression_ = Expression::Normal;
-    std::string message_;
     bool loaded_ = false;
 
-    void loadExpression(Expression expression);
     [[nodiscard]] static Expression expressionFor(
         CharacterReaction reaction
     ) noexcept;
