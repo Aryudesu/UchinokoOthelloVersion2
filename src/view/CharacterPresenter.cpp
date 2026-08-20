@@ -111,6 +111,7 @@ void CharacterPresenter::Start(
     );
 
     expression_ = Expression::Normal;
+    reaction_ = CharacterReaction::Start;
     loaded_ = true;
     Show(CharacterReaction::Start);
 }
@@ -123,6 +124,7 @@ void CharacterPresenter::End() {
 
 void CharacterPresenter::Show(CharacterReaction reaction) {
     if (!loaded_) return;
+    reaction_ = reaction;
     expression_ = expressionFor(reaction);
 }
 
@@ -153,12 +155,15 @@ void CharacterPresenter::Draw() const {
         border, FALSE
     );
 
-    const std::string& message = messages_[indexOf(
-        expression_ == Expression::Normal
-            ? CharacterReaction::Start
-            : CharacterReaction::Thinking
-    )];
-    (void)message;
+    const std::string& message = messages_[indexOf(reaction_)];
+    if (!message.empty()) {
+        DrawString(
+            MessageLeft + 16,
+            MessageTop + 24,
+            message.c_str(),
+            text
+        );
+    }
 }
 
 CharacterPresenter::Expression CharacterPresenter::expressionFor(
