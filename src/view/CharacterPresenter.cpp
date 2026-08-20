@@ -7,10 +7,10 @@
 #include <algorithm>
 
 namespace {
-    constexpr int FacePanelLeft = 4;
-    constexpr int FacePanelTop = 196;
-    constexpr int FacePanelRight = 204;
-    constexpr int FacePanelBottom = 396;
+    constexpr int FacePanelLeft = 624;
+    constexpr int FacePanelTop = 72;
+    constexpr int FacePanelRight = 824;
+    constexpr int FacePanelBottom = 272;
     constexpr int FaceInset = 4;
     constexpr float FaceX =
         static_cast<float>(FacePanelLeft + FaceInset);
@@ -21,10 +21,10 @@ namespace {
     constexpr int ExpressionRows = 15;
     constexpr int AnimationFrameMs = 120;
 
-    constexpr int MessageLeft = 16;
-    constexpr int MessageTop = 400;
-    constexpr int MessageRight = 624;
-    constexpr int MessageBottom = 468;
+    constexpr int MessageLeft = 520;
+    constexpr int MessageTop = 304;
+    constexpr int MessageRight = 936;
+    constexpr int MessageBottom = 400;
 
     constexpr const char* DifficultyImageKeys[] = {
         "easy",
