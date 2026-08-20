@@ -1,57 +1,37 @@
-#define NOMINMAX
 #include "view/CharacterPresenter.h"
 
 #include "manager/ImageManager.h"
 #include "util/LoadIni.h"
 #include "DxLib.h"
-#include <Windows.h>
 
-#include <string_view>
-
+#include <algorithm>
 
 namespace {
-    constexpr float FaceX = 16.0f;
-    constexpr float FaceY = 220.0f;
+    constexpr float FaceX = 8.0f;
+    constexpr float FaceY = 208.0f;
+    constexpr int FaceFrameSize = 192;
+    constexpr int AnimationFrames = 16;
+    constexpr int ExpressionRows = 15;
+    constexpr int AnimationFrameMs = 120;
+
     constexpr int MessageLeft = 16;
     constexpr int MessageTop = 400;
     constexpr int MessageRight = 624;
     constexpr int MessageBottom = 468;
 
-    std::string utf8ToLocal(std::string_view text) {
-        if (text.empty()) return {};
-
-        const int byteCount = static_cast<int>(text.size());
-        const int wideCount = MultiByteToWideChar(
-            CP_UTF8, 0, text.data(), byteCount, nullptr, 0
-        );
-        if (wideCount <= 0) return std::string(text);
-
-        std::wstring wide(static_cast<std::size_t>(wideCount), L'\0');
-        MultiByteToWideChar(
-            CP_UTF8, 0, text.data(), byteCount, wide.data(), wideCount
-        );
-
-        const int localCount = WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount, nullptr, 0, nullptr, nullptr
-        );
-        if (localCount <= 0) return std::string(text);
-
-        std::string local(static_cast<std::size_t>(localCount), '\0');
-        WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount,
-            local.data(), localCount, nullptr, nullptr
-        );
-        return local;
-    }
-
-    constexpr const char* DefaultImages[] = {
-        "data/img/faceNormal.bmp",
-        "data/img/faceEasy.bmp",
-        "data/img/faceHard.bmp",
-        "data/img/face.bmp",
+    constexpr const char* DifficultyImageKeys[] = {
+        "easy",
+        "normal",
+        "hard",
     };
 
-    constexpr const char* ImageKeys[] = {
+    constexpr const char* DefaultSheets[] = {
+        "data/img/faceEasy.bmp",
+        "data/img/faceNormal.bmp",
+        "data/img/faceHard.bmp",
+    };
+
+    constexpr const char* ExpressionKeys[] = {
         "normal",
         "happy",
         "serious",
@@ -87,24 +67,50 @@ namespace {
     };
 }
 
-void CharacterPresenter::Start(const std::string& configPath) {
+void CharacterPresenter::Start(
+    const std::string& configPath,
+    int difficultyIndex
+) {
     INIDat ini(configPath);
 
-    for (std::size_t i = 0; i < imagePaths_.size(); ++i) {
-        imagePaths_[i] = ini.GetStr(
-            "Images",
-            ImageKeys[i],
-            DefaultImages[i]
+    for (std::size_t i = 0; i < expressionRows_.size(); ++i) {
+        expressionRows_[i] = std::clamp(
+            ini.GetInt(
+                "ExpressionRows",
+                ExpressionKeys[i],
+                expressionRows_[i]
+            ),
+            0,
+            ExpressionRows - 1
         );
     }
     for (std::size_t i = 0; i < messages_.size(); ++i) {
-        messages_[i] = utf8ToLocal(ini.GetStr(
+        messages_[i] = ini.GetStr(
             "Dialogue",
             MessageKeys[i],
             DefaultMessages[i]
-        ));
+        );
     }
 
+    const int selected = std::clamp(difficultyIndex, 0, 2);
+    const std::string sheetPath = ini.GetStr(
+        "Sheets",
+        DifficultyImageKeys[selected],
+        DefaultSheets[selected]
+    );
+
+    auto& images = ImageManager::GetInstance();
+    images.SetTrans(255, 255, 255);
+    images.LoadDiv(
+        ImageID::MainChara,
+        FaceFrameSize,
+        FaceFrameSize,
+        AnimationFrames,
+        ExpressionRows,
+        sheetPath
+    );
+
+    expression_ = Expression::Normal;
     loaded_ = true;
     Show(CharacterReaction::Start);
 }
@@ -112,23 +118,25 @@ void CharacterPresenter::Start(const std::string& configPath) {
 void CharacterPresenter::End() {
     if (!loaded_) return;
     ImageManager::GetInstance().Destroy(ImageID::MainChara);
-    message_.clear();
     loaded_ = false;
 }
 
 void CharacterPresenter::Show(CharacterReaction reaction) {
     if (!loaded_) return;
-
-    const Expression nextExpression = expressionFor(reaction);
-    loadExpression(nextExpression);
-    message_ = messages_[indexOf(reaction)];
+    expression_ = expressionFor(reaction);
 }
 
 void CharacterPresenter::Draw() const {
     if (!loaded_) return;
 
+    const int animationFrame =
+        (GetNowCount() / AnimationFrameMs) % AnimationFrames;
+    const int expressionRow = expressionRows_[indexOf(expression_)];
+    const int imageIndex =
+        expressionRow * AnimationFrames + animationFrame;
+
     auto& images = ImageManager::GetInstance();
-    images.Draw(FaceX, FaceY, ImageID::MainChara);
+    images.Draw(FaceX, FaceY, ImageID::MainChara, imageIndex);
 
     const int panel = GetColor(20, 24, 36);
     const int border = GetColor(170, 180, 200);
@@ -136,50 +144,21 @@ void CharacterPresenter::Draw() const {
 
     SetDrawBlendMode(DX_BLENDMODE_ALPHA, 225);
     DrawBox(
-        MessageLeft,
-        MessageTop,
-        MessageRight,
-        MessageBottom,
-        panel,
-        TRUE
+        MessageLeft, MessageTop, MessageRight, MessageBottom,
+        panel, TRUE
     );
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     DrawBox(
-        MessageLeft,
-        MessageTop,
-        MessageRight,
-        MessageBottom,
-        border,
-        FALSE
+        MessageLeft, MessageTop, MessageRight, MessageBottom,
+        border, FALSE
     );
 
-    if (!message_.empty()) {
-        DrawString(
-            MessageLeft + 16,
-            MessageTop + 24,
-            message_.c_str(),
-            text
-        );
-    }
-}
-
-void CharacterPresenter::loadExpression(Expression expression) {
-    if (expression == expression_ && loaded_) {
-        int width = 0;
-        int height = 0;
-        ImageManager::GetInstance().Size(
-            ImageID::MainChara,
-            width,
-            height
-        );
-        if (width > 0 && height > 0) return;
-    }
-
-    expression_ = expression;
-    ImageManager::GetInstance().Load(
-        ImageID::MainChara,
-        imagePaths_[indexOf(expression)]
-    );
+    const std::string& message = messages_[indexOf(
+        expression_ == Expression::Normal
+            ? CharacterReaction::Start
+            : CharacterReaction::Thinking
+    )];
+    (void)message;
 }
 
 CharacterPresenter::Expression CharacterPresenter::expressionFor(
@@ -196,8 +175,6 @@ CharacterPresenter::Expression CharacterPresenter::expressionFor(
     case CharacterReaction::Lose:
     case CharacterReaction::AiPass:
         return Expression::Troubled;
-    case CharacterReaction::Start:
-    case CharacterReaction::Draw:
     default:
         return Expression::Normal;
     }
