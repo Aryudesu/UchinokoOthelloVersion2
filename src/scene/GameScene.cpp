@@ -12,10 +12,10 @@ namespace {
     }
 
     std::string utf8ToLocal(std::u8string_view text) {
-        return {
+        return std::string(
             reinterpret_cast<const char*>(text.data()),
             text.size()
-        };
+        );
     }
 
 
