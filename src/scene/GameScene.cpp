@@ -3,7 +3,6 @@
 #include "core/GameSettings.h"
 #include "manager/InputManager.h"
 #include "DxLib.h"
-#include <Windows.h>
 
 #include <cstdio>
 
@@ -13,31 +12,10 @@ namespace {
     }
 
     std::string utf8ToLocal(std::u8string_view text) {
-        if (text.empty()) return {};
-
-        const char* bytes = reinterpret_cast<const char*>(text.data());
-        const int byteCount = static_cast<int>(text.size());
-        const int wideCount = MultiByteToWideChar(
-            CP_UTF8, 0, bytes, byteCount, nullptr, 0
-        );
-        if (wideCount <= 0) return {};
-
-        std::wstring wide(static_cast<std::size_t>(wideCount), L'\0');
-        MultiByteToWideChar(
-            CP_UTF8, 0, bytes, byteCount, wide.data(), wideCount
-        );
-
-        const int localCount = WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount, nullptr, 0, nullptr, nullptr
-        );
-        if (localCount <= 0) return {};
-
-        std::string local(static_cast<std::size_t>(localCount), '\0');
-        WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount,
-            local.data(), localCount, nullptr, nullptr
-        );
-        return local;
+        return {
+            reinterpret_cast<const char*>(text.data()),
+            text.size()
+        };
     }
 
 
@@ -72,7 +50,10 @@ GameScene::~GameScene() {
 
 void GameScene::Start() {
     boardView_.Start();
-    character_.Start("data/config/character.ini");
+    character_.Start(
+        "data/config/character.ini",
+        GameSettings::GetInstance().difficultyIndex()
+    );
     resetMatch();
 }
 
