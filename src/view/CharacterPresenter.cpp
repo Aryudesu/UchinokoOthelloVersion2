@@ -10,7 +10,7 @@ namespace {
     constexpr int FacePanelLeft = 4;
     constexpr int FacePanelTop = 196;
     constexpr int FacePanelRight = 204;
-    constexpr int FacePanelBottom = 400;
+    constexpr int FacePanelBottom = 396;
     constexpr int FaceInset = 4;
     constexpr float FaceX =
         static_cast<float>(FacePanelLeft + FaceInset);
