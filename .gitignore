@@ -27,3 +27,6 @@ x86/
 # Others
 *.aps
 *.dxa
+
+# Generated neural-network training data
+othello_training*.csv

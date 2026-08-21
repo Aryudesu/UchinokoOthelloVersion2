@@ -1,6 +1,7 @@
 #include "ai/OthelloAI.h"
 #include "ai/NeuralMoveOrderer.h"
 #include "ai/inference/ModelFormat.h"
+#include "ai/training/OthelloTrainingData.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
 #include "model/BitBoard.h"
@@ -471,6 +472,63 @@ namespace {
         );
     }
 
+    void testOthelloTrainingData() {
+        BitBoard board;
+        const auto blackInput = OthelloTrainingData::Encode(
+            board,
+            Disc::Black
+        );
+        require(
+            blackInput[3 * 8 + 4] == 1.0f &&
+            blackInput[4 * 8 + 3] == 1.0f,
+            "Training input omitted current-player discs"
+        );
+        require(
+            blackInput[64 + 3 * 8 + 3] == 1.0f &&
+            blackInput[64 + 4 * 8 + 4] == 1.0f,
+            "Training input omitted opponent discs"
+        );
+
+        const auto whiteInput = OthelloTrainingData::Encode(
+            board,
+            Disc::White
+        );
+        require(
+            whiteInput[3 * 8 + 3] == 1.0f &&
+            whiteInput[64 + 3 * 8 + 4] == 1.0f,
+            "Training input is not relative to the side to move"
+        );
+
+        std::array<bool, 64> transformed{};
+        for (
+            int symmetry = 0;
+            symmetry < OthelloTrainingData::SymmetryCount;
+            ++symmetry
+        ) {
+            const int index = OthelloTrainingData::TransformIndex(
+                1,
+                symmetry
+            );
+            require(!transformed[index], "Board symmetry was duplicated");
+            transformed[index] = true;
+        }
+
+        constexpr const char* CsvPath = "core_test_training.csv";
+        {
+            OthelloTrainingData::CsvWriter writer;
+            require(writer.Open(CsvPath), "Could not create training CSV");
+            require(
+                writer.Write(board, Disc::Black, 2 * 8 + 3, true),
+                "Could not write augmented training data"
+            );
+            require(
+                writer.rowsWritten() == 8,
+                "Training data did not emit all board symmetries"
+            );
+        }
+        std::remove(CsvPath);
+    }
+
     void testExactEndgame() {
         BitBoard board;
         Disc turn = Disc::Black;
@@ -530,6 +588,7 @@ int main() {
         testLegacyOpeningBook();
         testAiReturnsLegalMove();
         testNeuralMoveOrderingModel();
+        testOthelloTrainingData();
         testExactEndgame();
         std::cout << "All core tests passed.\n";
         return 0;

@@ -85,6 +85,7 @@
     <ClCompile Include="..\src\ai\OthelloAI.cpp" />
     <ClCompile Include="..\src\ai\NeuralMoveOrderer.cpp" />
     <ClCompile Include="..\src\ai\inference\FastInferenceModel.cpp" />
+    <ClCompile Include="..\src\ai\training\OthelloTrainingData.cpp" />
     <ClCompile Include="..\src\ai\OpeningBook.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -93,6 +94,7 @@
     <ClInclude Include="..\include\ai\NeuralMoveOrderer.h" />
     <ClInclude Include="..\include\ai\inference\FastInferenceModel.h" />
     <ClInclude Include="..\include\ai\inference\ModelFormat.h" />
+    <ClInclude Include="..\include\ai\training\OthelloTrainingData.h" />
     <ClInclude Include="..\include\ai\OpeningBook.h" />
     <ClInclude Include="..\include\ai\OpeningBookData.h" />
   </ItemGroup>
