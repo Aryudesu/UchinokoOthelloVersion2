@@ -15,6 +15,11 @@ void AiTurnController::Configure(const DifficultyProfile& profile) {
 
     ai_.setDepth(profile.searchDepth);
     ai_.setExactEndgameEmpty(profile.exactEndgameEmpty);
+    ai_.configureNeuralOrdering(
+        profile.neuralOrderingEnabled,
+        profile.neuralModelPath,
+        profile.neuralOrderingMinimumDepth
+    );
     minimumThinkingMs_ = profile.minimumThinkingMs;
     maximumThinkingMs_ = profile.maximumThinkingMs;
     searchTimeLimit_ = std::chrono::milliseconds(profile.timeLimitMs);

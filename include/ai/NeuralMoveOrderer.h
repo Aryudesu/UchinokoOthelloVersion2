@@ -4,6 +4,7 @@
 #include "model/BitBoard.h"
 
 #include <array>
+#include <cstddef>
 #include <string>
 
 class NeuralMoveOrderer {

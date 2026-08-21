@@ -13,6 +13,9 @@ struct DifficultyProfile {
     int timeLimitMs = 10'000;
     int minimumThinkingMs = 600;
     int maximumThinkingMs = 800;
+    bool neuralOrderingEnabled = false;
+    std::string neuralModelPath = "data/model/othello_ordering.model";
+    int neuralOrderingMinimumDepth = 4;
 };
 
 class GameSettings {

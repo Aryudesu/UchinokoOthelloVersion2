@@ -1,19 +1,27 @@
 #include "ai/OthelloAI.h"
+#include "ai/NeuralMoveOrderer.h"
+#include "ai/inference/ModelFormat.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
 
 #include <bit>
+#include <array>
+#include <cstdio>
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <fstream>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
     using Bits = BitBoard::Bits;
+    constexpr const char* NeuralTestModelPath =
+        "core_test_ordering.model";
 
     void require(bool condition, const std::string& message) {
         if (!condition) throw std::runtime_error(message);
@@ -371,6 +379,98 @@ namespace {
         require(!noMove.has_value(), "AI accepted Disc::Empty");
     }
 
+    void testNeuralMoveOrderingModel() {
+        struct ModelCleanup {
+            ~ModelCleanup() { std::remove(NeuralTestModelPath); }
+        } cleanup;
+
+        std::ofstream output(NeuralTestModelPath, std::ios::binary);
+        require(output.good(), "Could not create neural ordering test model");
+
+        const std::uint32_t version = ModelFormat::Version;
+        const std::uint32_t parameterCount = 2;
+        output.write(ModelFormat::Magic, sizeof(ModelFormat::Magic) - 1);
+        output.write(
+            reinterpret_cast<const char*>(&version),
+            sizeof(version)
+        );
+        output.write(
+            reinterpret_cast<const char*>(&parameterCount),
+            sizeof(parameterCount)
+        );
+
+        const auto writeMatrix = [&output](
+            std::int32_t rows,
+            std::int32_t columns,
+            const std::vector<float>& values
+        ) {
+            output.write(reinterpret_cast<const char*>(&rows), sizeof(rows));
+            output.write(
+                reinterpret_cast<const char*>(&columns),
+                sizeof(columns)
+            );
+            output.write(
+                reinterpret_cast<const char*>(values.data()),
+                static_cast<std::streamsize>(values.size() * sizeof(float))
+            );
+        };
+
+        std::vector<float> weights(
+            NeuralMoveOrderer::OutputSize * NeuralMoveOrderer::InputSize,
+            0.0f
+        );
+        std::vector<float> biases(NeuralMoveOrderer::OutputSize);
+        for (std::size_t index = 0; index < biases.size(); ++index) {
+            biases[index] = static_cast<float>(index);
+        }
+        writeMatrix(64, 128, weights);
+        writeMatrix(64, 1, biases);
+        output.close();
+        require(output.good(), "Could not finish neural ordering test model");
+
+        NeuralMoveOrderer orderer;
+        require(
+            orderer.Configure(true, NeuralTestModelPath, 4),
+            "Valid neural ordering model was rejected"
+        );
+        require(orderer.IsActive(), "Neural ordering was not activated");
+
+        BitBoard board;
+        std::array<float, NeuralMoveOrderer::OutputSize> scores{};
+        require(
+            !orderer.Score(board, Disc::Black, 3, scores),
+            "Neural ordering ignored its minimum depth"
+        );
+        require(
+            orderer.Score(board, Disc::Black, 4, scores),
+            "Neural ordering inference failed"
+        );
+        require(
+            scores.front() == 0.0f && scores.back() == 63.0f,
+            "Neural ordering returned unexpected move scores"
+        );
+
+        require(
+            !orderer.Configure(false, NeuralTestModelPath, 4),
+            "Disabled neural ordering reported activation"
+        );
+        require(!orderer.IsActive(), "Neural ordering stayed active");
+
+        OthelloAI ai;
+        require(
+            !ai.configureNeuralOrdering(
+                true,
+                "missing_ordering_model.model",
+                4
+            ),
+            "Missing neural ordering model was accepted"
+        );
+        require(
+            !ai.neuralOrderingActive(),
+            "Missing model did not fall back to heuristic ordering"
+        );
+    }
+
     void testExactEndgame() {
         BitBoard board;
         Disc turn = Disc::Black;
@@ -429,6 +529,7 @@ int main() {
         testRandomGamesAndPasses();
         testLegacyOpeningBook();
         testAiReturnsLegalMove();
+        testNeuralMoveOrderingModel();
         testExactEndgame();
         std::cout << "All core tests passed.\n";
         return 0;
