@@ -7,8 +7,8 @@ class BoardView {
 public:
     static constexpr int CellSize = 40;
     static constexpr int BoardSize = BitBoard::Size;
-    static constexpr int BoardLeft = 200;
-    static constexpr int BoardTop = 80;
+    static constexpr int BoardLeft = 80;
+    static constexpr int BoardTop = 120;
 
     void Start();
     void End();

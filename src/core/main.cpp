@@ -9,35 +9,37 @@
 #include <windows.h>
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
-    // ƒƒK[‰Šú‰»
+    // ãƒ­ã‚¬ãƒ¼åˆæœŸåŒ–
     Log::I().init();
     DebugOverlay overlay;
 
 
-	// DXƒ‰ƒCƒuƒ‰ƒŠ‰Šú‰»
+	// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªåˆæœŸåŒ–
     SetOutApplicationLogValidFlag(FALSE);
     ChangeWindowMode(TRUE);
+    SetGraphMode(960, 720, 32);
+    SetUseCharCodeFormat(DX_CHARCODEFORMAT_UTF8);
     if (DxLib_Init() == -1) {
         MessageBox(NULL, "Dxlib Init Failed", "Error", MB_OK | MB_ICONERROR);
         return -1;
     }
     SetDrawScreen(DX_SCREEN_BACK);
 
-    // ƒV[ƒ“ŠJn
+    // ã‚·ãƒ¼ãƒ³é–‹å§‹
     SceneManager mgr;
     mgr.startWith(SceneID::Title);
     try {
         LOG_DEBUG("Mainloop started");
-		// ƒƒCƒ“ƒ‹[ƒv
+		// ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—
         while (mgr.running() && ProcessMessage() == 0) {
 
             FramePacer::GetInstance().Update();
 			InputManager::GetInstance().Update();
 
-			// XVˆ—
+			// æ›´æ–°å‡¦ç†
             mgr.update();
 
-			// •`‰æˆ—
+			// æç”»å‡¦ç†
             if (ClearDrawScreen() != 0) break;
             mgr.draw();
             overlay.updateAndDraw();
@@ -49,7 +51,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ 
         MessageBoxA(NULL, e.what(), "Error", MB_OK | MB_ICONERROR);
     }
 
-    // DXƒ‰ƒCƒuƒ‰ƒŠI—¹ˆ—
+    // DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªçµ‚äº†å‡¦ç†
     DxLib_End();
     return 0;
 }

@@ -3,7 +3,6 @@
 #include "core/GameSettings.h"
 #include "manager/InputManager.h"
 #include "DxLib.h"
-#include <Windows.h>
 
 #include <cstdio>
 
@@ -13,44 +12,23 @@ namespace {
     }
 
     std::string utf8ToLocal(std::u8string_view text) {
-        if (text.empty()) return {};
-
-        const char* bytes = reinterpret_cast<const char*>(text.data());
-        const int byteCount = static_cast<int>(text.size());
-        const int wideCount = MultiByteToWideChar(
-            CP_UTF8, 0, bytes, byteCount, nullptr, 0
+        return std::string(
+            reinterpret_cast<const char*>(text.data()),
+            text.size()
         );
-        if (wideCount <= 0) return {};
-
-        std::wstring wide(static_cast<std::size_t>(wideCount), L'\0');
-        MultiByteToWideChar(
-            CP_UTF8, 0, bytes, byteCount, wide.data(), wideCount
-        );
-
-        const int localCount = WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount, nullptr, 0, nullptr, nullptr
-        );
-        if (localCount <= 0) return {};
-
-        std::string local(static_cast<std::size_t>(localCount), '\0');
-        WideCharToMultiByte(
-            CP_ACP, 0, wide.data(), wideCount,
-            local.data(), localCount, nullptr, nullptr
-        );
-        return local;
     }
 
 
-    constexpr int ResultPanelLeft = 180;
-    constexpr int ResultPanelTop = 150;
-    constexpr int ResultPanelRight = 540;
-    constexpr int ResultPanelBottom = 350;
-    constexpr int RematchLeft = 220;
-    constexpr int RematchRight = 340;
-    constexpr int TitleLeft = 380;
-    constexpr int TitleRight = 500;
-    constexpr int ButtonTop = 295;
-    constexpr int ButtonBottom = 330;
+    constexpr int ResultPanelLeft = 270;
+    constexpr int ResultPanelTop = 210;
+    constexpr int ResultPanelRight = 690;
+    constexpr int ResultPanelBottom = 480;
+    constexpr int RematchLeft = 320;
+    constexpr int RematchRight = 460;
+    constexpr int TitleLeft = 500;
+    constexpr int TitleRight = 640;
+    constexpr int ButtonTop = 415;
+    constexpr int ButtonBottom = 455;
 
     bool insideRect(
         int x, int y,
@@ -72,11 +50,16 @@ GameScene::~GameScene() {
 
 void GameScene::Start() {
     boardView_.Start();
+    character_.Start(
+        "data/config/character.ini",
+        GameSettings::GetInstance().difficultyIndex()
+    );
     resetMatch();
 }
 
 void GameScene::End() {
     cancelAiSearch();
+    character_.End();
     boardView_.End();
 }
 
@@ -128,6 +111,7 @@ void GameScene::resetMatch() {
     playerDisc_ = settings.playerDisc();
     aiDisc_ = settings.aiDisc();
     aiTurn_.Configure(difficulty);
+    character_.Show(CharacterReaction::Start);
 
     end_ = false;
     next_ = SceneID::Game;
@@ -261,6 +245,7 @@ void GameScene::startAiSearch() {
     if (phase_ == Phase::AiThinking) return;
 
     aiTurn_.Start(board_, aiDisc_);
+    character_.Show(CharacterReaction::Thinking);
     phase_ = Phase::AiThinking;
 }
 
@@ -286,21 +271,58 @@ void GameScene::updateOpeningName() {
 }
 
 void GameScene::advanceTurn() {
+    const Disc movedDisc = turn_;
     const Disc next = opponentOf(turn_);
     passed_ = Disc::Empty;
 
     if (board_.hasAnyMove(next)) {
         turn_ = next;
+        updateCharacterReaction(movedDisc);
         return;
     }
 
     if (board_.hasAnyMove(turn_)) {
         passed_ = next;
+        character_.Show(
+            next == playerDisc_
+                ? CharacterReaction::PlayerPass
+                : CharacterReaction::AiPass
+        );
         return;
     }
 
     gameOver_ = true;
     phase_ = Phase::GameOver;
+
+    const MatchResult result = MatchResult::From(board_);
+    const MatchWinner aiWinner = aiDisc_ == Disc::Black
+        ? MatchWinner::Black
+        : MatchWinner::White;
+    if (result.winner == MatchWinner::Draw) {
+        character_.Show(CharacterReaction::Draw);
+    } else if (result.winner == aiWinner) {
+        character_.Show(CharacterReaction::Win);
+    } else {
+        character_.Show(CharacterReaction::Lose);
+    }
+}
+
+void GameScene::updateCharacterReaction(Disc movedDisc) {
+    constexpr int AdvantageThreshold = 4;
+    const int difference =
+        board_.count(aiDisc_) - board_.count(playerDisc_);
+
+    if (difference >= AdvantageThreshold) {
+        character_.Show(CharacterReaction::Advantage);
+    } else if (difference <= -AdvantageThreshold) {
+        character_.Show(CharacterReaction::Disadvantage);
+    } else {
+        character_.Show(
+            movedDisc == aiDisc_
+                ? CharacterReaction::AiMove
+                : CharacterReaction::PlayerMove
+        );
+    }
 }
 
 void GameScene::Draw() {
@@ -386,20 +408,27 @@ void GameScene::Draw() {
 
     DrawString(32, 32, "Othello vs AI", whiteColor);
     DrawString(32, 56, "Click a legal move / ESC : Back to Title", whiteColor);
-    DrawString(32, 80, score, whiteColor);
-    DrawString(32, 104, status, gameOver_ ? noticeColor : whiteColor);
-    DrawString(32, 128, aiInfo, whiteColor);
+    DrawString(520, 432, score, whiteColor);
+    DrawString(520, 456, status, gameOver_ ? noticeColor : whiteColor);
+    DrawString(520, 480, aiInfo, whiteColor);
 
     if (!openingName_.empty()) {
         const std::string openingInfo = "Opening: " + openingName_;
-        DrawString(32, 152, openingInfo.c_str(), noticeColor);
+        DrawString(520, 504, openingInfo.c_str(), noticeColor);
     }
 
     if (passed_ != Disc::Empty) {
         char passMessage[64];
         std::snprintf(passMessage, sizeof(passMessage), "%s passes", discName(passed_));
-        DrawString(32, openingName_.empty() ? 152 : 176, passMessage, noticeColor);
+        DrawString(
+            520,
+            openingName_.empty() ? 504 : 528,
+            passMessage,
+            noticeColor
+        );
     }
+
+    character_.Draw();
 
     if (gameOver_ && !boardView_.IsAnimating()) {
         drawResult(MatchResult::From(board_));
@@ -431,7 +460,7 @@ void GameScene::drawResult(const MatchResult& result) const {
     const char* headline = "DRAW";
     if (result.winner == playerWinner) headline = "YOU WIN!";
     if (result.winner == aiWinner) headline = "AI WINS";
-    DrawString(310, 175, headline, accent);
+    DrawString(430, 245, headline, accent);
 
     char finalScore[64];
     std::snprintf(
@@ -439,7 +468,7 @@ void GameScene::drawResult(const MatchResult& result) const {
         "BLACK %d  -  %d WHITE",
         result.blackCount, result.whiteCount
     );
-    DrawString(270, 210, finalScore, white);
+    DrawString(370, 285, finalScore, white);
 
     char difference[64];
     std::snprintf(
@@ -449,8 +478,8 @@ void GameScene::drawResult(const MatchResult& result) const {
             : "DIFFERENCE: %d",
         result.difference
     );
-    DrawString(300, 240, difference, white);
-    DrawString(260, 268, "Select with mouse or arrow keys", white);
+    DrawString(410, 320, difference, white);
+    DrawString(350, 355, "Select with mouse or arrow keys", white);
 
     DrawBox(
         RematchLeft, ButtonTop, RematchRight, ButtonBottom,
@@ -462,8 +491,8 @@ void GameScene::drawResult(const MatchResult& result) const {
         resultChoice_ == ResultChoice::Title ? selected : idle,
         TRUE
     );
-    DrawString(246, 305, "REMATCH", white);
-    DrawString(420, 305, "TITLE", white);
+    DrawString(352, 427, "REMATCH", white);
+    DrawString(548, 427, "TITLE", white);
 }
 
 bool GameScene::IsEnd() const {

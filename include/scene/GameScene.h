@@ -5,6 +5,7 @@
 #include "model/MatchResult.h"
 #include "ai/AiTurnController.h"
 #include "view/BoardView.h"
+#include "view/CharacterPresenter.h"
 
 #include <cstdint>
 #include <optional>
@@ -28,6 +29,7 @@ class GameScene : public SceneBase {
     BitBoard board_;
     BoardView boardView_;
     AiTurnController aiTurn_;
+    CharacterPresenter character_;
     Disc playerDisc_ = Disc::Black;
     Disc aiDisc_ = Disc::White;
     Disc turn_ = Disc::Black;
@@ -57,6 +59,7 @@ class GameScene : public SceneBase {
     void finishAiSearch();
     void cancelAiSearch();
     void updateOpeningName();
+    void updateCharacterReaction(Disc movedDisc);
 
 public:
     ~GameScene() override;
