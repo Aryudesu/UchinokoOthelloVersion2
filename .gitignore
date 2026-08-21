@@ -30,3 +30,6 @@ x86/
 
 # Generated neural-network training data
 othello_training*.csv
+
+# Locally trained neural-network models
+data/model/*.model
