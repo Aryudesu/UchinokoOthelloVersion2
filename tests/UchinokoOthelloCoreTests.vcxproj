@@ -87,6 +87,7 @@
     <ClCompile Include="..\src\ai\inference\FastInferenceModel.cpp" />
     <ClCompile Include="..\src\ai\training\OthelloTrainingData.cpp" />
     <ClCompile Include="..\src\ai\OpeningBook.cpp" />
+    <ClCompile Include="..\src\ai\SearchStatisticsLogger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\model\BitBoard.h" />
@@ -97,6 +98,7 @@
     <ClInclude Include="..\include\ai\training\OthelloTrainingData.h" />
     <ClInclude Include="..\include\ai\OpeningBook.h" />
     <ClInclude Include="..\include\ai\OpeningBookData.h" />
+    <ClInclude Include="..\include\ai\SearchStatisticsLogger.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

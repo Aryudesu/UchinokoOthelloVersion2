@@ -23,6 +23,7 @@ x86/
 
 # logs
 .logs/*.txt
+data/log/*.csv
 
 # Others
 *.aps

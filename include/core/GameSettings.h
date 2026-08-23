@@ -16,6 +16,8 @@ struct DifficultyProfile {
     bool neuralOrderingEnabled = false;
     std::string neuralModelPath = "data/model/othello_ordering.model";
     int neuralOrderingMinimumDepth = 4;
+    bool searchStatisticsEnabled = false;
+    std::string searchStatisticsPath = "data/log/search_statistics.csv";
 };
 
 class GameSettings {

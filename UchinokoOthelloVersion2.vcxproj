@@ -25,6 +25,7 @@
     <ClCompile Include="src\ai\NeuralMoveOrderer.cpp" />
     <ClCompile Include="src\ai\inference\FastInferenceModel.cpp" />
     <ClCompile Include="src\ai\AiTurnController.cpp" />
+    <ClCompile Include="src\ai\SearchStatisticsLogger.cpp" />
     <ClCompile Include="src\ai\OpeningBook.cpp" />
     <ClCompile Include="src\model\BitBoard.cpp" />
     <ClCompile Include="src\scene\GameScene.cpp" />
@@ -46,6 +47,7 @@
     <ClInclude Include="include\ai\inference\FastInferenceModel.h" />
     <ClInclude Include="include\ai\inference\ModelFormat.h" />
     <ClInclude Include="include\ai\AiTurnController.h" />
+    <ClInclude Include="include\ai\SearchStatisticsLogger.h" />
     <ClInclude Include="include\ai\OpeningBook.h" />
     <ClInclude Include="include\ai\OpeningBookData.h" />
     <ClInclude Include="include\model\BitBoard.h" />
