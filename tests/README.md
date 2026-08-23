@@ -28,3 +28,4 @@ invariant when a regression is detected.
 - Pass and game-over behavior
 - AI legality and configured search depth
 - Exact endgame search compared with an independent minimax result
+- Search-statistics CSV creation, append behavior, escaping, and rates

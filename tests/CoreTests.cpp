@@ -4,6 +4,7 @@
 #include "ai/training/OthelloTrainingData.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
+#include "ai/SearchStatisticsLogger.h"
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
 
@@ -579,6 +580,61 @@ namespace {
         const int actual = solveExactly(selected, opposite(turn), turn);
         require(actual == expected, "Exact search did not choose an optimal move");
     }
+
+    void testSearchStatisticsLogger() {
+        constexpr const char* CsvPath = "core_test_search_statistics.csv";
+        std::remove(CsvPath);
+
+        SearchStatisticsEntry entry;
+        entry.difficultyName = "TEST,NN";
+        entry.black = 0x0000000810000000ULL;
+        entry.white = 0x0000001008000000ULL;
+        entry.turn = Disc::Black;
+        entry.configuredDepth = 10;
+        entry.targetDepth = 10;
+        entry.completedDepth = 8;
+        entry.emptyCount = 60;
+        entry.legalMoveCount = 4;
+        entry.timeLimitMs = 10'000;
+        entry.elapsedMs = 2'000;
+        entry.searchedNodes = 50'000;
+        entry.transpositionHits = 2'500;
+        entry.timedOut = true;
+        entry.neuralOrderingEnabled = true;
+        entry.neuralOrderingActive = true;
+        entry.neuralOrderingMinimumDepth = 4;
+        entry.moveRow = 2;
+        entry.moveCol = 3;
+        entry.score = 42;
+
+        require(
+            SearchStatisticsLogger::Append(CsvPath, entry),
+            "Could not write search statistics"
+        );
+        require(
+            SearchStatisticsLogger::Append(CsvPath, entry),
+            "Could not append search statistics"
+        );
+
+        std::ifstream input(CsvPath);
+        require(input.good(), "Could not reopen search statistics");
+        std::vector<std::string> lines;
+        for (std::string line; std::getline(input, line);) {
+            lines.push_back(std::move(line));
+        }
+        require(lines.size() == 3, "Search statistics header was duplicated");
+        require(
+            lines[1].find("\"TEST,NN\"") != std::string::npos,
+            "Search statistics did not escape CSV text"
+        );
+        require(
+            lines[1].find(",2000,50000,25000.00,2500,5.00,") !=
+                std::string::npos,
+            "Search statistics calculated rates incorrectly"
+        );
+        input.close();
+        std::remove(CsvPath);
+    }
 }
 
 int main() {
@@ -590,6 +646,7 @@ int main() {
         testNeuralMoveOrderingModel();
         testOthelloTrainingData();
         testExactEndgame();
+        testSearchStatisticsLogger();
         std::cout << "All core tests passed.\n";
         return 0;
     } catch (const std::exception& error) {

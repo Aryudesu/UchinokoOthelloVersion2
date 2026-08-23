@@ -89,6 +89,16 @@ void GameSettings::Load(const std::string& path) {
             1,
             64
         );
+        profile.searchStatisticsEnabled = ini.GetBool(
+            section,
+            "search_statistics_enabled",
+            profile.searchStatisticsEnabled
+        );
+        profile.searchStatisticsPath = ini.GetStr(
+            section,
+            "search_statistics_path",
+            profile.searchStatisticsPath
+        );
     }
 }
 
