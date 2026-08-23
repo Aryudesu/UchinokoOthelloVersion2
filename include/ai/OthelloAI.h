@@ -1,12 +1,14 @@
 #pragma once
 
 #include "model/BitBoard.h"
+#include "ai/NeuralMoveOrderer.h"
 #include "ai/OpeningBook.h"
 
 #include <atomic>
 #include <cstdint>
 #include <optional>
 #include <stop_token>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -38,6 +40,14 @@ public:
 
     void setDepth(int depth) noexcept;
     void setExactEndgameEmpty(int emptyCount) noexcept;
+    bool configureNeuralOrdering(
+        bool enabled,
+        const std::string& modelPath,
+        int minimumDepth
+    );
+    [[nodiscard]] bool neuralOrderingActive() const noexcept {
+        return neuralMoveOrderer_.IsActive();
+    }
     [[nodiscard]] int depth() const noexcept { return depth_; }
     [[nodiscard]] int exactEndgameEmpty() const noexcept {
         return exactEndgameEmpty_;
@@ -91,6 +101,7 @@ private:
 
     int depth_ = 5;
     OpeningBook openingBook_;
+    mutable NeuralMoveOrderer neuralMoveOrderer_;
     int exactEndgameEmpty_ = 14;
     mutable std::uint64_t searchedNodes_ = 0;
     mutable std::uint64_t transpositionHits_ = 0;
@@ -128,7 +139,8 @@ private:
     [[nodiscard]] std::vector<Move> orderedMoves(
         const BitBoard& board,
         Disc disc,
-        int preferredMoveIndex = -1
+        int preferredMoveIndex,
+        int remainingDepth
     ) const;
 
     void storeTransposition(

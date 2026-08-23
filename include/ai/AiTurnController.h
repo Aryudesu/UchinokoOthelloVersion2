@@ -50,6 +50,7 @@ private:
     std::optional<OthelloAI::Move> completedMove_;
     std::mutex resultMutex_;
     std::atomic<bool> searchFinished_{ false };
+    std::atomic<long long> searchElapsedMs_{ 0 };
     std::mt19937 delayRandom_;
 
     int minimumThinkingMs_ = 600;
@@ -57,9 +58,23 @@ private:
     std::chrono::milliseconds selectedMinimumTime_{ 700 };
     std::chrono::milliseconds searchTimeLimit_{ 10'000 };
     std::chrono::steady_clock::time_point startedAt_{};
+    BitBoard searchBoard_;
+    Disc searchDisc_ = Disc::Empty;
+    std::string difficultyName_;
+    std::string searchStatisticsPath_;
+    int configuredDepth_ = 0;
+    int timeLimitMs_ = 10'000;
+    int neuralOrderingMinimumDepth_ = 4;
+    bool neuralOrderingEnabled_ = false;
+    bool neuralOrderingActive_ = false;
+    bool searchStatisticsEnabled_ = false;
 
     bool active_ = false;
     bool completed_ = false;
     bool timeoutRequested_ = false;
     std::jthread thread_;
+
+    void appendSearchStatistics(
+        const std::optional<OthelloAI::Move>& move
+    ) const;
 };

@@ -1,19 +1,29 @@
 #include "ai/OthelloAI.h"
+#include "ai/NeuralMoveOrderer.h"
+#include "ai/inference/ModelFormat.h"
+#include "ai/training/OthelloTrainingData.h"
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
+#include "ai/SearchStatisticsLogger.h"
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
 
 #include <bit>
+#include <array>
+#include <cstdio>
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <fstream>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
     using Bits = BitBoard::Bits;
+    constexpr const char* NeuralTestModelPath =
+        "core_test_ordering.model";
 
     void require(bool condition, const std::string& message) {
         if (!condition) throw std::runtime_error(message);
@@ -371,6 +381,155 @@ namespace {
         require(!noMove.has_value(), "AI accepted Disc::Empty");
     }
 
+    void testNeuralMoveOrderingModel() {
+        struct ModelCleanup {
+            ~ModelCleanup() { std::remove(NeuralTestModelPath); }
+        } cleanup;
+
+        std::ofstream output(NeuralTestModelPath, std::ios::binary);
+        require(output.good(), "Could not create neural ordering test model");
+
+        const std::uint32_t version = ModelFormat::Version;
+        const std::uint32_t parameterCount = 2;
+        output.write(ModelFormat::Magic, sizeof(ModelFormat::Magic) - 1);
+        output.write(
+            reinterpret_cast<const char*>(&version),
+            sizeof(version)
+        );
+        output.write(
+            reinterpret_cast<const char*>(&parameterCount),
+            sizeof(parameterCount)
+        );
+
+        const auto writeMatrix = [&output](
+            std::int32_t rows,
+            std::int32_t columns,
+            const std::vector<float>& values
+        ) {
+            output.write(reinterpret_cast<const char*>(&rows), sizeof(rows));
+            output.write(
+                reinterpret_cast<const char*>(&columns),
+                sizeof(columns)
+            );
+            output.write(
+                reinterpret_cast<const char*>(values.data()),
+                static_cast<std::streamsize>(values.size() * sizeof(float))
+            );
+        };
+
+        std::vector<float> weights(
+            NeuralMoveOrderer::OutputSize * NeuralMoveOrderer::InputSize,
+            0.0f
+        );
+        std::vector<float> biases(NeuralMoveOrderer::OutputSize);
+        for (std::size_t index = 0; index < biases.size(); ++index) {
+            biases[index] = static_cast<float>(index);
+        }
+        writeMatrix(64, 128, weights);
+        writeMatrix(64, 1, biases);
+        output.close();
+        require(output.good(), "Could not finish neural ordering test model");
+
+        NeuralMoveOrderer orderer;
+        require(
+            orderer.Configure(true, NeuralTestModelPath, 4),
+            "Valid neural ordering model was rejected"
+        );
+        require(orderer.IsActive(), "Neural ordering was not activated");
+
+        BitBoard board;
+        std::array<float, NeuralMoveOrderer::OutputSize> scores{};
+        require(
+            !orderer.Score(board, Disc::Black, 3, scores),
+            "Neural ordering ignored its minimum depth"
+        );
+        require(
+            orderer.Score(board, Disc::Black, 4, scores),
+            "Neural ordering inference failed"
+        );
+        require(
+            scores.front() == 0.0f && scores.back() == 63.0f,
+            "Neural ordering returned unexpected move scores"
+        );
+
+        require(
+            !orderer.Configure(false, NeuralTestModelPath, 4),
+            "Disabled neural ordering reported activation"
+        );
+        require(!orderer.IsActive(), "Neural ordering stayed active");
+
+        OthelloAI ai;
+        require(
+            !ai.configureNeuralOrdering(
+                true,
+                "missing_ordering_model.model",
+                4
+            ),
+            "Missing neural ordering model was accepted"
+        );
+        require(
+            !ai.neuralOrderingActive(),
+            "Missing model did not fall back to heuristic ordering"
+        );
+    }
+
+    void testOthelloTrainingData() {
+        BitBoard board;
+        const auto blackInput = OthelloTrainingData::Encode(
+            board,
+            Disc::Black
+        );
+        require(
+            blackInput[3 * 8 + 4] == 1.0f &&
+            blackInput[4 * 8 + 3] == 1.0f,
+            "Training input omitted current-player discs"
+        );
+        require(
+            blackInput[64 + 3 * 8 + 3] == 1.0f &&
+            blackInput[64 + 4 * 8 + 4] == 1.0f,
+            "Training input omitted opponent discs"
+        );
+
+        const auto whiteInput = OthelloTrainingData::Encode(
+            board,
+            Disc::White
+        );
+        require(
+            whiteInput[3 * 8 + 3] == 1.0f &&
+            whiteInput[64 + 3 * 8 + 4] == 1.0f,
+            "Training input is not relative to the side to move"
+        );
+
+        std::array<bool, 64> transformed{};
+        for (
+            int symmetry = 0;
+            symmetry < OthelloTrainingData::SymmetryCount;
+            ++symmetry
+        ) {
+            const int index = OthelloTrainingData::TransformIndex(
+                1,
+                symmetry
+            );
+            require(!transformed[index], "Board symmetry was duplicated");
+            transformed[index] = true;
+        }
+
+        constexpr const char* CsvPath = "core_test_training.csv";
+        {
+            OthelloTrainingData::CsvWriter writer;
+            require(writer.Open(CsvPath), "Could not create training CSV");
+            require(
+                writer.Write(board, Disc::Black, 2 * 8 + 3, true),
+                "Could not write augmented training data"
+            );
+            require(
+                writer.rowsWritten() == 8,
+                "Training data did not emit all board symmetries"
+            );
+        }
+        std::remove(CsvPath);
+    }
+
     void testExactEndgame() {
         BitBoard board;
         Disc turn = Disc::Black;
@@ -421,6 +580,61 @@ namespace {
         const int actual = solveExactly(selected, opposite(turn), turn);
         require(actual == expected, "Exact search did not choose an optimal move");
     }
+
+    void testSearchStatisticsLogger() {
+        constexpr const char* CsvPath = "core_test_search_statistics.csv";
+        std::remove(CsvPath);
+
+        SearchStatisticsEntry entry;
+        entry.difficultyName = "TEST,NN";
+        entry.black = 0x0000000810000000ULL;
+        entry.white = 0x0000001008000000ULL;
+        entry.turn = Disc::Black;
+        entry.configuredDepth = 10;
+        entry.targetDepth = 10;
+        entry.completedDepth = 8;
+        entry.emptyCount = 60;
+        entry.legalMoveCount = 4;
+        entry.timeLimitMs = 10'000;
+        entry.elapsedMs = 2'000;
+        entry.searchedNodes = 50'000;
+        entry.transpositionHits = 2'500;
+        entry.timedOut = true;
+        entry.neuralOrderingEnabled = true;
+        entry.neuralOrderingActive = true;
+        entry.neuralOrderingMinimumDepth = 4;
+        entry.moveRow = 2;
+        entry.moveCol = 3;
+        entry.score = 42;
+
+        require(
+            SearchStatisticsLogger::Append(CsvPath, entry),
+            "Could not write search statistics"
+        );
+        require(
+            SearchStatisticsLogger::Append(CsvPath, entry),
+            "Could not append search statistics"
+        );
+
+        std::ifstream input(CsvPath);
+        require(input.good(), "Could not reopen search statistics");
+        std::vector<std::string> lines;
+        for (std::string line; std::getline(input, line);) {
+            lines.push_back(std::move(line));
+        }
+        require(lines.size() == 3, "Search statistics header was duplicated");
+        require(
+            lines[1].find("\"TEST,NN\"") != std::string::npos,
+            "Search statistics did not escape CSV text"
+        );
+        require(
+            lines[1].find(",2000,50000,25000.00,2500,5.00,") !=
+                std::string::npos,
+            "Search statistics calculated rates incorrectly"
+        );
+        input.close();
+        std::remove(CsvPath);
+    }
 }
 
 int main() {
@@ -429,7 +643,10 @@ int main() {
         testRandomGamesAndPasses();
         testLegacyOpeningBook();
         testAiReturnsLegalMove();
+        testNeuralMoveOrderingModel();
+        testOthelloTrainingData();
         testExactEndgame();
+        testSearchStatisticsLogger();
         std::cout << "All core tests passed.\n";
         return 0;
     } catch (const std::exception& error) {

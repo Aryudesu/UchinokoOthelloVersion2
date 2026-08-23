@@ -71,6 +71,34 @@ void GameSettings::Load(const std::string& path) {
                 profile.maximumThinkingMs
             );
         }
+        profile.neuralOrderingEnabled = ini.GetBool(
+            section,
+            "neural_ordering_enabled",
+            profile.neuralOrderingEnabled
+        );
+        profile.neuralModelPath = ini.GetStr(
+            section,
+            "neural_model_path",
+            profile.neuralModelPath
+        );
+        profile.neuralOrderingMinimumDepth = clamped(
+            ini,
+            section,
+            "neural_ordering_minimum_depth",
+            profile.neuralOrderingMinimumDepth,
+            1,
+            64
+        );
+        profile.searchStatisticsEnabled = ini.GetBool(
+            section,
+            "search_statistics_enabled",
+            profile.searchStatisticsEnabled
+        );
+        profile.searchStatisticsPath = ini.GetStr(
+            section,
+            "search_statistics_path",
+            profile.searchStatisticsPath
+        );
     }
 }
 

@@ -47,6 +47,18 @@ void OthelloAI::setExactEndgameEmpty(int emptyCount) noexcept {
     exactEndgameEmpty_ = std::clamp(emptyCount, 0, 20);
 }
 
+bool OthelloAI::configureNeuralOrdering(
+    bool enabled,
+    const std::string& modelPath,
+    int minimumDepth
+) {
+    return neuralMoveOrderer_.Configure(
+        enabled,
+        modelPath,
+        minimumDepth
+    );
+}
+
 std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const BitBoard& board,
     Disc disc,
@@ -134,7 +146,7 @@ OthelloAI::Move OthelloAI::searchRoot(
     bool exactSearch,
     int preferredMoveIndex
 ) const {
-    auto moves = orderedMoves(board, disc, preferredMoveIndex);
+    auto moves = orderedMoves(board, disc, preferredMoveIndex, depth);
     Move bestMove;
     int alpha = -Infinity;
     const int beta = Infinity;
@@ -235,7 +247,7 @@ int OthelloAI::negaScout(
         return score;
     }
 
-    const auto moves = orderedMoves(board, turn, preferredMoveIndex);
+    const auto moves = orderedMoves(board, turn, preferredMoveIndex, depth);
     bool firstMove = true;
     int bestMoveIndex = -1;
     for (const Move& move : moves) {
@@ -318,7 +330,8 @@ int OthelloAI::terminalScore(
 std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
     const BitBoard& board,
     Disc disc,
-    int preferredMoveIndex
+    int preferredMoveIndex,
+    int remainingDepth
 ) const {
     std::vector<Move> result;
     BitBoard::Bits moves = board.legalMoves(disc);
@@ -344,10 +357,30 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
         moves &= moves - 1;
     }
 
+    std::array<float, NeuralMoveOrderer::OutputSize> neuralScores{};
+    const bool useNeuralOrdering = neuralMoveOrderer_.Score(
+        board,
+        disc,
+        remainingDepth,
+        neuralScores
+    );
+
     std::sort(
         result.begin(),
         result.end(),
-        [](const Move& lhs, const Move& rhs) {
+        [&neuralScores, useNeuralOrdering](
+            const Move& lhs,
+            const Move& rhs
+        ) {
+            if (useNeuralOrdering) {
+                const int lhsIndex =
+                    lhs.row * BitBoard::Size + lhs.col;
+                const int rhsIndex =
+                    rhs.row * BitBoard::Size + rhs.col;
+                if (neuralScores[lhsIndex] != neuralScores[rhsIndex]) {
+                    return neuralScores[lhsIndex] > neuralScores[rhsIndex];
+                }
+            }
             return lhs.score > rhs.score;
         }
     );
