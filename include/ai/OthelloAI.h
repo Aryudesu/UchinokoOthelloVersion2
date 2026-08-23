@@ -5,6 +5,7 @@
 #include "ai/OpeningBook.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <stop_token>
@@ -20,6 +21,7 @@ public:
         std::atomic<int> completedDepth{ 0 };
         std::atomic<int> targetDepth{ 0 };
         std::atomic<bool> exactSearch{ false };
+        std::atomic<bool> timedOut{ false };
 
         void reset(int target, bool exact) noexcept;
     };
@@ -64,7 +66,9 @@ public:
         const BitBoard& board,
         Disc disc,
         std::stop_token stopToken = {},
-        SearchProgress* progress = nullptr
+        SearchProgress* progress = nullptr,
+        std::optional<std::chrono::steady_clock::time_point> deadline =
+            std::nullopt
     ) const;
 
 private:
@@ -106,6 +110,7 @@ private:
     mutable std::uint64_t searchedNodes_ = 0;
     mutable std::uint64_t transpositionHits_ = 0;
     mutable std::stop_token stopToken_;
+    mutable std::optional<std::chrono::steady_clock::time_point> deadline_;
     mutable SearchProgress* progress_ = nullptr;
     mutable std::unordered_map<
         PositionKey,

@@ -71,7 +71,6 @@ private:
 
     bool active_ = false;
     bool completed_ = false;
-    bool timeoutRequested_ = false;
     std::jthread thread_;
 
     void appendSearchStatistics(
