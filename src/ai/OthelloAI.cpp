@@ -33,6 +33,7 @@ void OthelloAI::SearchProgress::reset(int target, bool exact) noexcept {
     completedDepth.store(0, std::memory_order_relaxed);
     targetDepth.store(target, std::memory_order_relaxed);
     exactSearch.store(exact, std::memory_order_relaxed);
+    timedOut.store(false, std::memory_order_relaxed);
 }
 
 OthelloAI::OthelloAI(int depth) noexcept {
@@ -63,7 +64,8 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const BitBoard& board,
     Disc disc,
     std::stop_token stopToken,
-    SearchProgress* progress
+    SearchProgress* progress,
+    std::optional<std::chrono::steady_clock::time_point> deadline
 ) const {
     if (disc == Disc::Empty || !board.hasAnyMove(disc)) {
         return std::nullopt;
@@ -89,6 +91,7 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     const int searchDepth = exactSearch ? emptyCount : depth_;
 
     stopToken_ = stopToken;
+    deadline_ = deadline;
     progress_ = progress;
     if (progress_) progress_->reset(searchDepth, exactSearch);
 
@@ -425,6 +428,15 @@ void OthelloAI::storeTransposition(
 
 void OthelloAI::checkCancellation() const {
     if (stopToken_.stop_requested()) throw SearchCancelled{};
+    if (
+        deadline_.has_value() &&
+        std::chrono::steady_clock::now() >= *deadline_
+    ) {
+        if (progress_) {
+            progress_->timedOut.store(true, std::memory_order_relaxed);
+        }
+        throw SearchCancelled{};
+    }
 }
 
 void OthelloAI::publishProgress() const noexcept {

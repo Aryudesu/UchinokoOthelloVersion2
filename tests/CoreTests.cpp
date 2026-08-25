@@ -377,6 +377,35 @@ namespace {
         require(searchedMove->searchedNodes > 0, "Fallback search visited no nodes");
         require(searchedMove->searchDepth == 3, "Fallback depth is incorrect");
 
+        OthelloAI::SearchProgress timeoutProgress;
+        const auto timedOutMove = ai.chooseMove(
+            board,
+            turn,
+            {},
+            &timeoutProgress,
+            std::chrono::steady_clock::now() - std::chrono::milliseconds(1)
+        );
+        require(!timedOutMove.has_value(), "Expired search returned a move");
+        require(
+            timeoutProgress.timedOut.load(std::memory_order_relaxed),
+            "Expired search did not report a timeout"
+        );
+
+        std::stop_source cancelledSource;
+        cancelledSource.request_stop();
+        OthelloAI::SearchProgress cancelledProgress;
+        const auto cancelledMove = ai.chooseMove(
+            board,
+            turn,
+            cancelledSource.get_token(),
+            &cancelledProgress
+        );
+        require(!cancelledMove.has_value(), "Cancelled search returned a move");
+        require(
+            !cancelledProgress.timedOut.load(std::memory_order_relaxed),
+            "Cancellation was incorrectly reported as a timeout"
+        );
+
         const auto noMove = ai.chooseMove(board, Disc::Empty);
         require(!noMove.has_value(), "AI accepted Disc::Empty");
     }

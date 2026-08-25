@@ -29,3 +29,4 @@ invariant when a regression is detected.
 - AI legality and configured search depth
 - Exact endgame search compared with an independent minimax result
 - Search-statistics CSV creation, append behavior, escaping, and rates
+- Worker-side search deadlines and timeout/cancellation distinction

@@ -41,7 +41,6 @@ void AiTurnController::Start(const BitBoard& board, Disc aiDisc) {
     progress_.reset(0, false);
     searchFinished_.store(false, std::memory_order_relaxed);
     searchElapsedMs_.store(0, std::memory_order_relaxed);
-    timeoutRequested_ = false;
     completed_ = false;
     completedMove_.reset();
     searchBoard_ = board;
@@ -55,16 +54,18 @@ void AiTurnController::Start(const BitBoard& board, Disc aiDisc) {
         delayDistribution(delayRandom_)
     );
     startedAt_ = std::chrono::steady_clock::now();
+    const auto searchDeadline = startedAt_ + searchTimeLimit_;
     active_ = true;
 
     thread_ = std::jthread(
-        [this, board, aiDisc](std::stop_token stopToken) {
+        [this, board, aiDisc, searchDeadline](std::stop_token stopToken) {
             const auto searchStartedAt = std::chrono::steady_clock::now();
             auto result = ai_.chooseMove(
                 board,
                 aiDisc,
                 stopToken,
-                &progress_
+                &progress_,
+                searchDeadline
             );
             searchElapsedMs_.store(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -86,15 +87,6 @@ void AiTurnController::Update() {
 
     const auto elapsed =
         std::chrono::steady_clock::now() - startedAt_;
-
-    if (
-        !searchFinished_.load(std::memory_order_acquire) &&
-        !timeoutRequested_ &&
-        elapsed >= searchTimeLimit_
-    ) {
-        timeoutRequested_ = true;
-        if (thread_.joinable()) thread_.request_stop();
-    }
 
     if (
         !searchFinished_.load(std::memory_order_acquire) ||
@@ -122,7 +114,6 @@ void AiTurnController::Cancel() {
 
     active_ = false;
     completed_ = false;
-    timeoutRequested_ = false;
     searchFinished_.store(false, std::memory_order_relaxed);
     progress_.reset(0, false);
 
@@ -170,7 +161,7 @@ void AiTurnController::appendSearchStatistics(
     entry.transpositionHits =
         progress_.transpositionHits.load(std::memory_order_relaxed);
     entry.exactSearch = progress_.exactSearch.load(std::memory_order_relaxed);
-    entry.timedOut = timeoutRequested_;
+    entry.timedOut = progress_.timedOut.load(std::memory_order_relaxed);
     entry.neuralOrderingEnabled = neuralOrderingEnabled_;
     entry.neuralOrderingActive = neuralOrderingActive_;
     entry.neuralOrderingMinimumDepth = neuralOrderingMinimumDepth_;
