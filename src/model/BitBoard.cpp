@@ -76,6 +76,14 @@ BitBoard::BitBoard() {
     reset();
 }
 
+std::optional<BitBoard> BitBoard::FromBits(Bits black, Bits white) noexcept {
+    if ((black & white) != 0) return std::nullopt;
+    BitBoard board;
+    board.black_ = black;
+    board.white_ = white;
+    return board;
+}
+
 void BitBoard::reset() {
     black_ = bitAt(3, 4) | bitAt(4, 3);
     white_ = bitAt(3, 3) | bitAt(4, 4);
