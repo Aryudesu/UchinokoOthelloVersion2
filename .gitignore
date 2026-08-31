@@ -32,5 +32,8 @@ data/log/*.csv
 # Generated neural-network training data
 othello_training*.csv
 
+# Generated fixed-position benchmark results
+neural_ordering_benchmark*.csv
+
 # Locally trained neural-network models
 data/model/*.model
