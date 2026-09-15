@@ -21,7 +21,9 @@ void AiTurnController::Configure(const DifficultyProfile& profile) {
     neuralOrderingActive_ = ai_.configureNeuralOrdering(
         profile.neuralOrderingEnabled,
         profile.neuralModelPath,
-        profile.neuralOrderingMinimumDepth
+        profile.neuralOrderingMinimumDepth,
+        profile.neuralOrderingMinimumLegalMoves,
+        profile.neuralOrderingBlendPercent
     );
     minimumThinkingMs_ = profile.minimumThinkingMs;
     maximumThinkingMs_ = profile.maximumThinkingMs;
@@ -31,6 +33,9 @@ void AiTurnController::Configure(const DifficultyProfile& profile) {
     timeLimitMs_ = profile.timeLimitMs;
     neuralOrderingEnabled_ = profile.neuralOrderingEnabled;
     neuralOrderingMinimumDepth_ = profile.neuralOrderingMinimumDepth;
+    neuralOrderingMinimumLegalMoves_ =
+        profile.neuralOrderingMinimumLegalMoves;
+    neuralOrderingBlendPercent_ = profile.neuralOrderingBlendPercent;
     searchStatisticsEnabled_ = profile.searchStatisticsEnabled;
     searchStatisticsPath_ = profile.searchStatisticsPath;
 }
@@ -165,10 +170,19 @@ void AiTurnController::appendSearchStatistics(
     entry.neuralOrderingEnabled = neuralOrderingEnabled_;
     entry.neuralOrderingActive = neuralOrderingActive_;
     entry.neuralOrderingMinimumDepth = neuralOrderingMinimumDepth_;
+    entry.neuralOrderingMinimumLegalMoves =
+        neuralOrderingMinimumLegalMoves_;
+    entry.neuralOrderingBlendPercent = neuralOrderingBlendPercent_;
+    entry.neuralOrderingCalls =
+        progress_.neuralOrderingCalls.load(std::memory_order_relaxed);
+    entry.neuralOrderingCacheHits =
+        progress_.neuralOrderingCacheHits.load(std::memory_order_relaxed);
     if (move.has_value()) {
         entry.completedDepth = move->searchDepth;
         entry.searchedNodes = move->searchedNodes;
         entry.transpositionHits = move->transpositionHits;
+        entry.neuralOrderingCalls = move->neuralOrderingCalls;
+        entry.neuralOrderingCacheHits = move->neuralOrderingCacheHits;
         entry.moveRow = move->row;
         entry.moveCol = move->col;
         entry.score = move->score;

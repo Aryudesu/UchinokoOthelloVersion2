@@ -1,7 +1,9 @@
 #include "ai/benchmark/SearchPositionCsv.h"
 #include <algorithm>
+#include <bit>
 #include <charconv>
 #include <fstream>
+#include <random>
 #include <string_view>
 #include <unordered_map>
 
@@ -42,6 +44,52 @@ namespace {
         if (text == "black") return Disc::Black;
         if (text == "white") return Disc::White;
         return Disc::Empty;
+    }
+
+    Disc opponentOf(Disc disc) noexcept {
+        return disc == Disc::Black ? Disc::White : Disc::Black;
+    }
+
+    int randomMoveIndex(BitBoard::Bits moves, std::mt19937& random) {
+        std::uniform_int_distribution<int> distribution(
+            0,
+            std::popcount(moves) - 1
+        );
+        int selected = distribution(random);
+        while (selected-- > 0) moves &= moves - 1;
+        return std::countr_zero(moves);
+    }
+
+    int generatedMoveIndex(
+        const BitBoard& board,
+        Disc turn,
+        BitBoard::Bits legalMoves,
+        std::mt19937& random
+    ) {
+        std::uniform_int_distribution<int> percent(0, 99);
+        if (percent(random) < 30) {
+            return randomMoveIndex(legalMoves, random);
+        }
+
+        int bestIndex = -1;
+        int bestScore = -1'000'000;
+        BitBoard::Bits candidates = legalMoves;
+        while (candidates != 0) {
+            const int index = std::countr_zero(candidates);
+            BitBoard child = board;
+            child.put(turn, index / BitBoard::Size, index % BitBoard::Size);
+            const bool corner =
+                index == 0 || index == 7 || index == 56 || index == 63;
+            const int score =
+                (corner ? 10'000 : 0) -
+                std::popcount(child.legalMoves(opponentOf(turn))) * 100;
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = index;
+            }
+            candidates &= candidates - 1;
+        }
+        return bestIndex;
     }
 }
 
@@ -96,6 +144,74 @@ bool SearchBenchmark::LoadPositions(const std::string& path, std::vector<Positio
             return false;
         }
         positions.push_back({ *board, turn, path, row });
+    }
+    return true;
+}
+
+bool SearchBenchmark::GeneratePositions(
+    const GenerationOptions& options,
+    std::vector<Position>& positions,
+    std::string& error
+) {
+    if (options.count == 0) return true;
+    if (
+        options.count > 10'000 ||
+        options.minimumEmpty < 0 ||
+        options.maximumEmpty > 60 ||
+        options.minimumEmpty > options.maximumEmpty
+    ) {
+        error = "Generated-position count or empty-square range is invalid";
+        return false;
+    }
+
+    std::mt19937 random(options.seed);
+    std::uniform_int_distribution<int> targetEmpty(
+        options.minimumEmpty,
+        options.maximumEmpty
+    );
+    const std::size_t targetSize = positions.size() + options.count;
+    const std::size_t maximumGames = options.count * 100 + 1'000;
+    std::size_t game = 0;
+    while (positions.size() < targetSize && game < maximumGames) {
+        ++game;
+        BitBoard board;
+        Disc turn = Disc::Black;
+        const int target = targetEmpty(random);
+        while (!board.isGameOver()) {
+            const BitBoard::Bits legalMoves = board.legalMoves(turn);
+            if (legalMoves == 0) {
+                turn = opponentOf(turn);
+                continue;
+            }
+            const int emptyCount =
+                64 - board.count(Disc::Black) - board.count(Disc::White);
+            if (emptyCount <= target) {
+                positions.push_back({
+                    board,
+                    turn,
+                    "generated(seed=" + std::to_string(options.seed) + ")",
+                    game,
+                });
+                break;
+            }
+            const int moveIndex = generatedMoveIndex(
+                board,
+                turn,
+                legalMoves,
+                random
+            );
+            board.put(
+                turn,
+                moveIndex / BitBoard::Size,
+                moveIndex % BitBoard::Size
+            );
+            turn = opponentOf(turn);
+        }
+    }
+    if (positions.size() != targetSize) {
+        error = "Could not generate enough legal positions for the "
+            "requested empty-square range";
+        return false;
     }
     return true;
 }

@@ -18,6 +18,8 @@ public:
     struct SearchProgress {
         std::atomic<std::uint64_t> searchedNodes{ 0 };
         std::atomic<std::uint64_t> transpositionHits{ 0 };
+        std::atomic<std::uint64_t> neuralOrderingCalls{ 0 };
+        std::atomic<std::uint64_t> neuralOrderingCacheHits{ 0 };
         std::atomic<int> completedDepth{ 0 };
         std::atomic<int> targetDepth{ 0 };
         std::atomic<bool> exactSearch{ false };
@@ -36,6 +38,8 @@ public:
         std::uint64_t transpositionHits = 0;
         int completedIterations = 0;
         bool openingBook = false;
+        std::uint64_t neuralOrderingCalls = 0;
+        std::uint64_t neuralOrderingCacheHits = 0;
     };
 
     explicit OthelloAI(int depth = 5) noexcept;
@@ -45,7 +49,9 @@ public:
     bool configureNeuralOrdering(
         bool enabled,
         const std::string& modelPath,
-        int minimumDepth
+        int minimumDepth,
+        int minimumLegalMoves = 1,
+        int blendPercent = 100
     );
     [[nodiscard]] bool neuralOrderingActive() const noexcept {
         return neuralMoveOrderer_.IsActive();
@@ -75,6 +81,7 @@ private:
     static constexpr int Infinity = 2'000'000;
     static constexpr int WinScore = 1'000'000;
     static constexpr std::size_t MaxTranspositionEntries = 500'000;
+    static constexpr std::size_t MaxNeuralOrderingCacheEntries = 20'000;
 
     enum class Bound : std::uint8_t {
         Exact,
@@ -109,6 +116,8 @@ private:
     int exactEndgameEmpty_ = 14;
     mutable std::uint64_t searchedNodes_ = 0;
     mutable std::uint64_t transpositionHits_ = 0;
+    mutable std::uint64_t neuralOrderingCalls_ = 0;
+    mutable std::uint64_t neuralOrderingCacheHits_ = 0;
     mutable std::stop_token stopToken_;
     mutable std::optional<std::chrono::steady_clock::time_point> deadline_;
     mutable SearchProgress* progress_ = nullptr;
@@ -117,6 +126,11 @@ private:
         TranspositionEntry,
         PositionKeyHash
     > transpositionTable_;
+    mutable std::unordered_map<
+        PositionKey,
+        std::array<float, NeuralMoveOrderer::OutputSize>,
+        PositionKeyHash
+    > neuralOrderingCache_;
 
     [[nodiscard]] Move searchRoot(
         const BitBoard& board,

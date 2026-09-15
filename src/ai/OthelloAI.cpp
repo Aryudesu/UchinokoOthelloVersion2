@@ -30,6 +30,8 @@ namespace {
 void OthelloAI::SearchProgress::reset(int target, bool exact) noexcept {
     searchedNodes.store(0, std::memory_order_relaxed);
     transpositionHits.store(0, std::memory_order_relaxed);
+    neuralOrderingCalls.store(0, std::memory_order_relaxed);
+    neuralOrderingCacheHits.store(0, std::memory_order_relaxed);
     completedDepth.store(0, std::memory_order_relaxed);
     targetDepth.store(target, std::memory_order_relaxed);
     exactSearch.store(exact, std::memory_order_relaxed);
@@ -41,7 +43,7 @@ OthelloAI::OthelloAI(int depth) noexcept {
 }
 
 void OthelloAI::setDepth(int depth) noexcept {
-    depth_ = std::clamp(depth, 1, 12);
+    depth_ = std::clamp(depth, 1, 20);
 }
 
 void OthelloAI::setExactEndgameEmpty(int emptyCount) noexcept {
@@ -51,13 +53,22 @@ void OthelloAI::setExactEndgameEmpty(int emptyCount) noexcept {
 bool OthelloAI::configureNeuralOrdering(
     bool enabled,
     const std::string& modelPath,
-    int minimumDepth
+    int minimumDepth,
+    int minimumLegalMoves,
+    int blendPercent
 ) {
-    return neuralMoveOrderer_.Configure(
+    const bool active = neuralMoveOrderer_.Configure(
         enabled,
         modelPath,
-        minimumDepth
+        minimumDepth,
+        minimumLegalMoves,
+        blendPercent
     );
+    neuralOrderingCache_.clear();
+    if (active) {
+        neuralOrderingCache_.reserve(MaxNeuralOrderingCacheEntries);
+    }
+    return active;
 }
 
 std::optional<OthelloAI::Move> OthelloAI::chooseMove(
@@ -97,8 +108,11 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
 
     searchedNodes_ = 0;
     transpositionHits_ = 0;
+    neuralOrderingCalls_ = 0;
+    neuralOrderingCacheHits_ = 0;
     transpositionTable_.clear();
     transpositionTable_.reserve(MaxTranspositionEntries);
+    neuralOrderingCache_.clear();
 
     Move bestMove;
     try {
@@ -130,6 +144,8 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
         bestMove.searchDepth = bestMove.completedIterations;
         bestMove.exactSearch = false;
         bestMove.transpositionHits = transpositionHits_;
+        bestMove.neuralOrderingCalls = neuralOrderingCalls_;
+        bestMove.neuralOrderingCacheHits = neuralOrderingCacheHits_;
         return bestMove;
     }
 
@@ -137,6 +153,8 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     bestMove.searchDepth = searchDepth;
     bestMove.exactSearch = exactSearch;
     bestMove.transpositionHits = transpositionHits_;
+    bestMove.neuralOrderingCalls = neuralOrderingCalls_;
+    bestMove.neuralOrderingCacheHits = neuralOrderingCacheHits_;
     publishProgress();
     progress_ = nullptr;
     return bestMove;
@@ -361,32 +379,122 @@ std::vector<OthelloAI::Move> OthelloAI::orderedMoves(
     }
 
     std::array<float, NeuralMoveOrderer::OutputSize> neuralScores{};
-    const bool useNeuralOrdering = neuralMoveOrderer_.Score(
-        board,
+    bool useNeuralOrdering = false;
+    if (neuralMoveOrderer_.ShouldScore(
         disc,
         remainingDepth,
-        neuralScores
-    );
-
-    std::sort(
-        result.begin(),
-        result.end(),
-        [&neuralScores, useNeuralOrdering](
-            const Move& lhs,
-            const Move& rhs
-        ) {
+        static_cast<int>(result.size())
+    )) {
+        const PositionKey key{ board.black(), board.white(), disc };
+        const auto cached = neuralOrderingCache_.find(key);
+        if (cached != neuralOrderingCache_.end()) {
+            neuralScores = cached->second;
+            useNeuralOrdering = true;
+            ++neuralOrderingCacheHits_;
+        } else {
+            useNeuralOrdering = neuralMoveOrderer_.Score(
+                board,
+                disc,
+                remainingDepth,
+                neuralScores,
+                static_cast<int>(result.size())
+            );
             if (useNeuralOrdering) {
-                const int lhsIndex =
-                    lhs.row * BitBoard::Size + lhs.col;
-                const int rhsIndex =
-                    rhs.row * BitBoard::Size + rhs.col;
+                ++neuralOrderingCalls_;
+                if (
+                    neuralOrderingCache_.size() <
+                    MaxNeuralOrderingCacheEntries
+                ) {
+                    neuralOrderingCache_.emplace(key, neuralScores);
+                }
+            }
+        }
+    }
+
+    if (
+        useNeuralOrdering &&
+        neuralMoveOrderer_.BlendPercent() < 100
+    ) {
+        std::array<int, BitBoard::Size * BitBoard::Size> heuristicRanks{};
+        std::array<int, BitBoard::Size * BitBoard::Size> neuralRanks{};
+        auto heuristicOrder = result;
+        auto neuralOrder = result;
+        const auto indexOf = [](const Move& move) {
+            return move.row * BitBoard::Size + move.col;
+        };
+        std::sort(
+            heuristicOrder.begin(),
+            heuristicOrder.end(),
+            [&indexOf](const Move& lhs, const Move& rhs) {
+                if (lhs.score != rhs.score) return lhs.score > rhs.score;
+                return indexOf(lhs) < indexOf(rhs);
+            }
+        );
+        std::sort(
+            neuralOrder.begin(),
+            neuralOrder.end(),
+            [&neuralScores, &indexOf](const Move& lhs, const Move& rhs) {
+                const int lhsIndex = indexOf(lhs);
+                const int rhsIndex = indexOf(rhs);
                 if (neuralScores[lhsIndex] != neuralScores[rhsIndex]) {
                     return neuralScores[lhsIndex] > neuralScores[rhsIndex];
                 }
+                if (lhs.score != rhs.score) return lhs.score > rhs.score;
+                return lhsIndex < rhsIndex;
             }
-            return lhs.score > rhs.score;
+        );
+        for (std::size_t rank = 0; rank < result.size(); ++rank) {
+            const int points = static_cast<int>(result.size() - rank);
+            heuristicRanks[indexOf(heuristicOrder[rank])] = points;
+            neuralRanks[indexOf(neuralOrder[rank])] = points;
         }
-    );
+
+        const int neuralWeight = neuralMoveOrderer_.BlendPercent();
+        std::sort(
+            result.begin(),
+            result.end(),
+            [
+                &heuristicRanks,
+                &neuralRanks,
+                &indexOf,
+                neuralWeight
+            ](const Move& lhs, const Move& rhs) {
+                const int lhsIndex = indexOf(lhs);
+                const int rhsIndex = indexOf(rhs);
+                const int lhsPriority =
+                    neuralWeight * neuralRanks[lhsIndex] +
+                    (100 - neuralWeight) * heuristicRanks[lhsIndex];
+                const int rhsPriority =
+                    neuralWeight * neuralRanks[rhsIndex] +
+                    (100 - neuralWeight) * heuristicRanks[rhsIndex];
+                if (lhsPriority != rhsPriority) {
+                    return lhsPriority > rhsPriority;
+                }
+                if (lhs.score != rhs.score) return lhs.score > rhs.score;
+                return lhsIndex < rhsIndex;
+            }
+        );
+    } else {
+        std::sort(
+            result.begin(),
+            result.end(),
+            [&neuralScores, useNeuralOrdering](
+                const Move& lhs,
+                const Move& rhs
+            ) {
+                if (useNeuralOrdering) {
+                    const int lhsIndex =
+                        lhs.row * BitBoard::Size + lhs.col;
+                    const int rhsIndex =
+                        rhs.row * BitBoard::Size + rhs.col;
+                    if (neuralScores[lhsIndex] != neuralScores[rhsIndex]) {
+                        return neuralScores[lhsIndex] > neuralScores[rhsIndex];
+                    }
+                }
+                return lhs.score > rhs.score;
+            }
+        );
+    }
     if (preferredMoveIndex >= 0) {
         const auto preferred = std::find_if(
             result.begin(), result.end(),
@@ -444,6 +552,12 @@ void OthelloAI::publishProgress() const noexcept {
     progress_->searchedNodes.store(searchedNodes_, std::memory_order_relaxed);
     progress_->transpositionHits.store(
         transpositionHits_, std::memory_order_relaxed
+    );
+    progress_->neuralOrderingCalls.store(
+        neuralOrderingCalls_, std::memory_order_relaxed
+    );
+    progress_->neuralOrderingCacheHits.store(
+        neuralOrderingCacheHits_, std::memory_order_relaxed
     );
 }
 

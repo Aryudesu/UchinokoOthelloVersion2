@@ -65,6 +65,8 @@ private:
     int configuredDepth_ = 0;
     int timeLimitMs_ = 10'000;
     int neuralOrderingMinimumDepth_ = 4;
+    int neuralOrderingMinimumLegalMoves_ = 1;
+    int neuralOrderingBlendPercent_ = 100;
     bool neuralOrderingEnabled_ = false;
     bool neuralOrderingActive_ = false;
     bool searchStatisticsEnabled_ = false;

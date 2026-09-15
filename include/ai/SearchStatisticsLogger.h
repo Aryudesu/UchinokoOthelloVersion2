@@ -24,6 +24,10 @@ struct SearchStatisticsEntry {
     bool neuralOrderingEnabled = false;
     bool neuralOrderingActive = false;
     int neuralOrderingMinimumDepth = 0;
+    int neuralOrderingMinimumLegalMoves = 0;
+    int neuralOrderingBlendPercent = 0;
+    std::uint64_t neuralOrderingCalls = 0;
+    std::uint64_t neuralOrderingCacheHits = 0;
     int moveRow = -1;
     int moveCol = -1;
     int score = 0;

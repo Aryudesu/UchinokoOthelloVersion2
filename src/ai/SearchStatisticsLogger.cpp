@@ -7,13 +7,16 @@
 #include <sstream>
 
 namespace {
-    constexpr const char* Header =
+    constexpr const char* LegacyHeader =
         "timestamp,difficulty,turn,black_bits,white_bits,empty_count,"
         "legal_moves,configured_depth,target_depth,completed_depth,"
         "exact_search,timed_out,time_limit_ms,elapsed_ms,nodes,"
         "nodes_per_second,tt_hits,tt_hit_percent,neural_enabled,"
         "neural_active,neural_minimum_depth,move_row,move_col,score,"
-        "opening_book\n";
+        "opening_book";
+    constexpr const char* HeaderSuffix =
+        ",neural_minimum_legal_moves,neural_blend_percent,neural_calls,"
+        "neural_cache_hits";
 
     std::string timestamp() {
         const auto now = std::chrono::system_clock::now();
@@ -69,9 +72,26 @@ bool SearchStatisticsLogger::Append(
             (!error && std::filesystem::file_size(outputPath, error) == 0);
         if (error) return false;
 
+        bool writeExtendedColumns = writeHeader;
+        if (!writeHeader) {
+            std::ifstream existing(outputPath);
+            std::string existingHeader;
+            if (!std::getline(existing, existingHeader)) return false;
+            if (!existingHeader.empty() && existingHeader.back() == '\r') {
+                existingHeader.pop_back();
+            }
+            const std::string currentHeader =
+                std::string(LegacyHeader) + HeaderSuffix;
+            if (existingHeader == currentHeader) {
+                writeExtendedColumns = true;
+            } else if (existingHeader != LegacyHeader) {
+                return false;
+            }
+        }
+
         std::ofstream output(outputPath, std::ios::app);
         if (!output) return false;
-        if (writeHeader) output << Header;
+        if (writeHeader) output << LegacyHeader << HeaderSuffix << '\n';
 
         const double nodesPerSecond = entry.elapsedMs > 0
             ? static_cast<double>(entry.searchedNodes) * 1000.0 /
@@ -109,8 +129,15 @@ bool SearchStatisticsLogger::Append(
             << entry.moveRow << ','
             << entry.moveCol << ','
             << entry.score << ','
-            << (entry.openingBook ? 1 : 0)
-            << '\n';
+            << (entry.openingBook ? 1 : 0);
+        if (writeExtendedColumns) {
+            output
+                << ',' << entry.neuralOrderingMinimumLegalMoves
+                << ',' << entry.neuralOrderingBlendPercent
+                << ',' << entry.neuralOrderingCalls
+                << ',' << entry.neuralOrderingCacheHits;
+        }
+        output << '\n';
         return output.good();
     } catch (...) {
         return false;
