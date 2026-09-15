@@ -77,6 +77,15 @@ public:
             std::nullopt
     ) const;
 
+    // Evaluates every legal move with the same full-window search. Unlike
+    // chooseMove(), this deliberately bypasses the opening book so the
+    // returned scores can be used as comparable policy-training targets.
+    [[nodiscard]] std::vector<Move> analyzeLegalMoves(
+        const BitBoard& board,
+        Disc disc,
+        int depth
+    ) const;
+
 private:
     static constexpr int Infinity = 2'000'000;
     static constexpr int WinScore = 1'000'000;

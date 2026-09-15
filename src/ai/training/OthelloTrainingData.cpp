@@ -66,6 +66,21 @@ bool CsvWriter::Open(const std::string& path) {
     return output_.good();
 }
 
+bool CsvWriter::OpenPolicyScores(const std::string& path) {
+    output_.close();
+    output_.clear();
+    output_.open(path, std::ios::out | std::ios::trunc);
+    rowsWritten_ = 0;
+    if (!output_) return false;
+
+    output_ << "# uchinoko_othello_policy_scores_v2\n"
+            << "# input_size=128\n"
+            << "# output_size=64\n"
+            << "# illegal_move=x\n"
+            << "# score_perspective=side_to_move\n";
+    return output_.good();
+}
+
 bool CsvWriter::Write(
     const BitBoard& board,
     Disc turn,
@@ -93,6 +108,54 @@ bool CsvWriter::Write(
             output_ << static_cast<int>(value) << ',';
         }
         output_ << TransformIndex(bestMoveIndex, symmetry) << '\n';
+        if (!output_) return false;
+        ++rowsWritten_;
+    }
+    return true;
+}
+
+bool CsvWriter::WritePolicyScores(
+    const BitBoard& board,
+    Disc turn,
+    const MoveScores& scores,
+    bool augmentSymmetries
+) {
+    if (!output_ || turn == Disc::Empty) return false;
+
+    const BitBoard::Bits legalMoves = board.legalMoves(turn);
+    if (legalMoves == 0) return false;
+    for (int index = 0; index < static_cast<int>(OutputSize); ++index) {
+        const bool legal = (
+            legalMoves & (static_cast<BitBoard::Bits>(1) << index)
+        ) != 0;
+        if (
+            legal == (
+                scores[static_cast<std::size_t>(index)] == IllegalMoveScore
+            )
+        ) {
+            return false;
+        }
+    }
+
+    const int symmetryCount = augmentSymmetries ? SymmetryCount : 1;
+    for (int symmetry = 0; symmetry < symmetryCount; ++symmetry) {
+        const Input input = Encode(board, turn, symmetry);
+        for (const float value : input) {
+            output_ << static_cast<int>(value) << ',';
+        }
+
+        MoveScores transformed;
+        transformed.fill(IllegalMoveScore);
+        for (int index = 0; index < static_cast<int>(OutputSize); ++index) {
+            transformed[static_cast<std::size_t>(
+                TransformIndex(index, symmetry)
+            )] = scores[static_cast<std::size_t>(index)];
+        }
+        for (std::size_t index = 0; index < transformed.size(); ++index) {
+            if (transformed[index] == IllegalMoveScore) output_ << 'x';
+            else output_ << transformed[index];
+            output_ << (index + 1 == transformed.size() ? '\n' : ',');
+        }
         if (!output_) return false;
         ++rowsWritten_;
     }
