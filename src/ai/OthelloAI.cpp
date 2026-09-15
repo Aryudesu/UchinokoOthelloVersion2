@@ -160,6 +160,71 @@ std::optional<OthelloAI::Move> OthelloAI::chooseMove(
     return bestMove;
 }
 
+std::vector<OthelloAI::Move> OthelloAI::analyzeLegalMoves(
+    const BitBoard& board,
+    Disc disc,
+    int depth
+) const {
+    std::vector<Move> result;
+    if (disc == Disc::Empty || !board.hasAnyMove(disc)) return result;
+
+    const int emptyCount =
+        64 - board.count(Disc::Black) - board.count(Disc::White);
+    const bool exactSearch = emptyCount <= exactEndgameEmpty_;
+    const int searchDepth = exactSearch
+        ? emptyCount
+        : std::clamp(depth, 1, 20);
+
+    stopToken_ = {};
+    deadline_.reset();
+    progress_ = nullptr;
+    searchedNodes_ = 0;
+    transpositionHits_ = 0;
+    neuralOrderingCalls_ = 0;
+    neuralOrderingCacheHits_ = 0;
+    transpositionTable_.clear();
+    transpositionTable_.reserve(MaxTranspositionEntries);
+    neuralOrderingCache_.clear();
+
+    BitBoard::Bits legalMoves = board.legalMoves(disc);
+    result.reserve(std::popcount(legalMoves));
+    while (legalMoves != 0) {
+        const int index = std::countr_zero(legalMoves);
+        legalMoves &= legalMoves - 1;
+
+        BitBoard child = board;
+        if (!child.put(
+            disc,
+            index / BitBoard::Size,
+            index % BitBoard::Size
+        )) {
+            continue;
+        }
+        const int score = -negaScout(
+            child,
+            opponentOf(disc),
+            searchDepth - 1,
+            -Infinity,
+            Infinity,
+            exactSearch
+        );
+        result.push_back({
+            index / BitBoard::Size,
+            index % BitBoard::Size,
+            score,
+            0,
+            searchDepth,
+            exactSearch,
+            0,
+            searchDepth,
+            false,
+            0,
+            0,
+        });
+    }
+    return result;
+}
+
 OthelloAI::Move OthelloAI::searchRoot(
     const BitBoard& board,
     Disc disc,

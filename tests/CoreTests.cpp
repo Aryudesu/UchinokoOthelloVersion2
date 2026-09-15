@@ -435,6 +435,22 @@ namespace {
         require(move->searchedNodes == 0, "Opening book unexpectedly searched");
         require(move->searchDepth == 0, "Opening book has a search depth");
 
+        const auto analyzed = ai.analyzeLegalMoves(board, Disc::Black, 1);
+        require(
+            analyzed.size() == 4,
+            "Policy teacher did not score every initial legal move"
+        );
+        for (const auto& candidate : analyzed) {
+            require(
+                board.canPut(Disc::Black, candidate.row, candidate.col),
+                "Policy teacher scored an illegal move"
+            );
+            require(
+                candidate.searchDepth == 1 && !candidate.openingBook,
+                "Policy teacher unexpectedly used opening-book metadata"
+            );
+        }
+
         // Leave the stored line and verify that the normal search still works.
         const int line[] = {
             4 * 8 + 5, 5 * 8 + 5, 5 * 8 + 4, 3 * 8 + 5,
@@ -681,6 +697,57 @@ namespace {
             );
         }
         std::remove(CsvPath);
+
+        constexpr const char* PolicyCsvPath =
+            "core_test_policy_training.csv";
+        OthelloTrainingData::MoveScores scores;
+        scores.fill(OthelloTrainingData::IllegalMoveScore);
+        Bits legalMoves = board.legalMoves(Disc::Black);
+        int score = 10;
+        while (legalMoves != 0) {
+            const int index = std::countr_zero(legalMoves);
+            legalMoves &= legalMoves - 1;
+            scores[static_cast<std::size_t>(index)] = score++;
+        }
+        {
+            OthelloTrainingData::CsvWriter writer;
+            require(
+                writer.OpenPolicyScores(PolicyCsvPath),
+                "Could not create policy-score CSV"
+            );
+            require(
+                writer.WritePolicyScores(
+                    board,
+                    Disc::Black,
+                    scores,
+                    true
+                ),
+                "Could not write policy-score training data"
+            );
+            require(
+                writer.rowsWritten() == 8,
+                "Policy scores did not emit all board symmetries"
+            );
+        }
+        {
+            std::ifstream input(PolicyCsvPath);
+            std::string line;
+            do {
+                require(
+                    static_cast<bool>(std::getline(input, line)),
+                    "Policy-score CSV contains no data row"
+                );
+            } while (!line.empty() && line.front() == '#');
+            require(
+                std::count(line.begin(), line.end(), ',') == 191,
+                "Policy-score CSV row does not have 192 fields"
+            );
+            require(
+                line.find(",x,") != std::string::npos,
+                "Policy-score CSV omitted illegal-move markers"
+            );
+        }
+        std::remove(PolicyCsvPath);
     }
 
     void testExactEndgame() {

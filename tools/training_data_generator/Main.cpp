@@ -19,6 +19,9 @@ struct Options {
     int teacherDepth = 5;
     int exactEndgameEmpty = 12;
     int explorationPercent = 30;
+    int minimumEmpty = 12;
+    int maximumEmpty = 52;
+    int minimumLegalMoves = 2;
     std::uint32_t seed = 0x5eed1234U;
     bool augmentSymmetries = true;
 };
@@ -73,6 +76,12 @@ bool parseOptions(int argc, char** argv, Options& options) {
             options.exactEndgameEmpty = static_cast<int>(number);
         } else if (argument == "--exploration-percent") {
             options.explorationPercent = static_cast<int>(number);
+        } else if (argument == "--min-empty") {
+            options.minimumEmpty = static_cast<int>(number);
+        } else if (argument == "--max-empty") {
+            options.maximumEmpty = static_cast<int>(number);
+        } else if (argument == "--minimum-legal-moves") {
+            options.minimumLegalMoves = static_cast<int>(number);
         } else if (argument == "--seed") {
             options.seed = static_cast<std::uint32_t>(number);
         } else {
@@ -85,7 +94,12 @@ bool parseOptions(int argc, char** argv, Options& options) {
         1 <= options.teacherDepth && options.teacherDepth <= 12 &&
         0 <= options.exactEndgameEmpty && options.exactEndgameEmpty <= 20 &&
         0 <= options.explorationPercent &&
-        options.explorationPercent <= 100;
+        options.explorationPercent <= 100 &&
+        0 <= options.minimumEmpty &&
+        options.minimumEmpty <= options.maximumEmpty &&
+        options.maximumEmpty <= 60 &&
+        1 <= options.minimumLegalMoves &&
+        options.minimumLegalMoves <= 64;
 }
 
 void printUsage() {
@@ -96,8 +110,14 @@ void printUsage() {
         << "  --depth N                    Teacher search depth (default: 5)\n"
         << "  --exact-endgame-empty N      Exact-search threshold (default: 12)\n"
         << "  --exploration-percent N      Random self-play moves (default: 30)\n"
+        << "  --min-empty N                Smallest recorded empty count (default: 12)\n"
+        << "  --max-empty N                Largest recorded empty count (default: 52)\n"
+        << "  --minimum-legal-moves N      Recorded branching threshold (default: 2)\n"
         << "  --seed N                     Reproducible random seed\n"
         << "  --no-augmentation            Do not emit eight board symmetries\n";
+    std::cout
+        << "\nEach row contains 128 board features followed by one search "
+        << "score per square. Illegal moves are written as x.\n";
 }
 
 Disc opponentOf(Disc disc) noexcept {
@@ -123,7 +143,7 @@ int main(int argc, char** argv) {
     }
 
     OthelloTrainingData::CsvWriter writer;
-    if (!writer.Open(options.outputPath)) {
+    if (!writer.OpenPolicyScores(options.outputPath)) {
         std::cerr << "Could not open output: " << options.outputPath << '\n';
         return 1;
     }
@@ -152,25 +172,53 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            const auto teacherMove = teacher.chooseMove(board, turn);
-            if (!teacherMove) {
-                std::cerr << "Teacher returned no move for a legal position.\n";
-                return 1;
-            }
-            const int teacherIndex =
-                teacherMove->row * BitBoard::Size + teacherMove->col;
-
             const PositionKey key{ board.black(), board.white(), turn };
-            if (seen.insert(key).second) {
-                if (!writer.Write(
+            const int emptyCount =
+                64 - board.count(Disc::Black) - board.count(Disc::White);
+            const bool recordPosition =
+                options.minimumEmpty <= emptyCount &&
+                emptyCount <= options.maximumEmpty &&
+                std::popcount(legalMoves) >= options.minimumLegalMoves &&
+                !seen.contains(key);
+
+            int teacherIndex = -1;
+            if (recordPosition) {
+                const auto teacherMoves = teacher.analyzeLegalMoves(
                     board,
                     turn,
-                    teacherIndex,
+                    options.teacherDepth
+                );
+                if (teacherMoves.empty()) {
+                    std::cerr
+                        << "Teacher returned no scores for a legal position.\n";
+                    return 1;
+                }
+                OthelloTrainingData::MoveScores teacherScores;
+                teacherScores.fill(OthelloTrainingData::IllegalMoveScore);
+                const OthelloAI::Move* bestTeacherMove =
+                    &teacherMoves.front();
+                for (const auto& move : teacherMoves) {
+                    const int index =
+                        move.row * BitBoard::Size + move.col;
+                    teacherScores[static_cast<std::size_t>(index)] =
+                        move.score;
+                    if (move.score > bestTeacherMove->score) {
+                        bestTeacherMove = &move;
+                    }
+                }
+                teacherIndex =
+                    bestTeacherMove->row * BitBoard::Size +
+                    bestTeacherMove->col;
+                if (!writer.WritePolicyScores(
+                    board,
+                    turn,
+                    teacherScores,
                     options.augmentSymmetries
                 )) {
                     std::cerr << "Could not write training row.\n";
                     return 1;
                 }
+                seen.insert(key);
                 ++generatedPositions;
                 if (
                     generatedPositions % 100 == 0 ||
@@ -182,6 +230,17 @@ int main(int argc, char** argv) {
                         << ", rows: " << writer.rowsWritten()
                         << ", games: " << games << '\n';
                 }
+            }
+
+            if (teacherIndex < 0) {
+                const auto teacherMove = teacher.chooseMove(board, turn);
+                if (!teacherMove) {
+                    std::cerr
+                        << "Teacher returned no move for a legal position.\n";
+                    return 1;
+                }
+                teacherIndex =
+                    teacherMove->row * BitBoard::Size + teacherMove->col;
             }
 
             int playedIndex = teacherIndex;
@@ -202,6 +261,7 @@ int main(int argc, char** argv) {
 
     std::cout
         << "Wrote " << writer.rowsWritten() << " rows to "
-        << options.outputPath << '\n';
+        << options.outputPath
+        << " (policy-score format v2)\n";
     return 0;
 }
