@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 enum class Disc : std::uint8_t {
     Empty,
@@ -14,6 +15,11 @@ public:
     static constexpr int Size = 8;
 
     BitBoard();
+
+    [[nodiscard]] static std::optional<BitBoard> FromBits(
+        Bits black,
+        Bits white
+    ) noexcept;
 
     void reset();
 

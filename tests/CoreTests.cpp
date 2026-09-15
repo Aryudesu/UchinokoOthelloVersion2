@@ -5,6 +5,7 @@
 #include "ai/OpeningBook.h"
 #include "ai/OpeningBookData.h"
 #include "ai/SearchStatisticsLogger.h"
+#include "ai/benchmark/SearchPositionCsv.h"
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
 
@@ -162,6 +163,29 @@ namespace {
         require(board.discAt(-1, 0) == Disc::Empty, "Out-of-range read failed");
 
         verifyAgainstReference(board);
+    }
+
+    void testPositionRestorationAndCsvLoading() {
+        BitBoard initial;
+        const auto restored = BitBoard::FromBits(initial.black(), initial.white());
+        require(restored.has_value(), "Valid bitboards were rejected");
+        require(restored->black() == initial.black() && restored->white() == initial.white(), "Restored bitboards changed");
+        require(!BitBoard::FromBits(1, 1).has_value(), "Overlapping bitboards were accepted");
+        constexpr const char* CsvPath = "core_test_benchmark_positions.csv";
+        {
+            std::ofstream output(CsvPath, std::ios::binary);
+            require(output.good(), "Could not create benchmark input CSV");
+            output << "\xEF\xBB\xBFturn,extra,white_bits,opening_book,black_bits\n";
+            output << "black,ignored," << std::hex << initial.white() << ",1," << initial.black() << "\n";
+            output << "black,ignored," << initial.white() << ",0," << initial.black() << "\n";
+        }
+        std::vector<SearchBenchmark::Position> positions;
+        std::string error;
+        require(SearchBenchmark::LoadPositions(CsvPath, positions, error), "Could not load benchmark positions: " + error);
+        require(positions.size() == 1, "Opening-book CSV row was not skipped");
+        require(positions.front().turn == Disc::Black, "CSV turn changed");
+        require(positions.front().board.black() == initial.black() && positions.front().board.white() == initial.white(), "CSV bitboards changed");
+        std::remove(CsvPath);
     }
 
     void testMatchResult() {
@@ -669,6 +693,8 @@ namespace {
 int main() {
     try {
         testInitialPosition();
+        testPositionRestorationAndCsvLoading();
+        testMatchResult();
         testRandomGamesAndPasses();
         testLegacyOpeningBook();
         testAiReturnsLegalMove();

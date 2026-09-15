@@ -30,3 +30,4 @@ invariant when a regression is detected.
 - Exact endgame search compared with an independent minimax result
 - Search-statistics CSV creation, append behavior, escaping, and rates
 - Worker-side search deadlines and timeout/cancellation distinction
+- Bitboard restoration and benchmark-position CSV loading
