@@ -1,16 +1,21 @@
 #include "ai/NeuralMoveOrderer.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <utility>
 
 bool NeuralMoveOrderer::Configure(
     bool enabled,
     const std::string& modelPath,
-    int minimumDepth
+    int minimumDepth,
+    int minimumLegalMoves,
+    int blendPercent
 ) {
     active_ = false;
     minimumDepth_ = std::clamp(minimumDepth, 1, 64);
+    minimumLegalMoves_ = std::clamp(minimumLegalMoves, 1, 64);
+    blendPercent_ = std::clamp(blendPercent, 1, 100);
     if (!enabled) return false;
 
     FastInferenceModel candidate;
@@ -31,15 +36,13 @@ bool NeuralMoveOrderer::Score(
     const BitBoard& board,
     Disc turn,
     int remainingDepth,
-    std::array<float, OutputSize>& scores
+    std::array<float, OutputSize>& scores,
+    int legalMoveCount
 ) noexcept {
-    if (
-        !active_ ||
-        turn == Disc::Empty ||
-        remainingDepth < minimumDepth_
-    ) {
-        return false;
+    if (legalMoveCount < 0 && turn != Disc::Empty) {
+        legalMoveCount = std::popcount(board.legalMoves(turn));
     }
+    if (!ShouldScore(turn, remainingDepth, legalMoveCount)) return false;
 
     input_.fill(0.0f);
     const BitBoard::Bits mine =
@@ -72,4 +75,16 @@ bool NeuralMoveOrderer::Score(
         scores.end(),
         [](float value) { return std::isfinite(value); }
     );
+}
+
+bool NeuralMoveOrderer::ShouldScore(
+    Disc turn,
+    int remainingDepth,
+    int legalMoveCount
+) const noexcept {
+    return
+        active_ &&
+        turn != Disc::Empty &&
+        remainingDepth >= minimumDepth_ &&
+        legalMoveCount >= minimumLegalMoves_;
 }

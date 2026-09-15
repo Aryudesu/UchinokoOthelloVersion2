@@ -47,7 +47,7 @@ void GameSettings::Load(const std::string& path) {
         const char* section = Sections[i];
 
         profile.searchDepth = clamped(
-            ini, section, "depth", profile.searchDepth, 1, 12
+            ini, section, "depth", profile.searchDepth, 1, 20
         );
         profile.exactEndgameEmpty = clamped(
             ini, section, "exact_endgame_empty",
@@ -88,6 +88,22 @@ void GameSettings::Load(const std::string& path) {
             profile.neuralOrderingMinimumDepth,
             1,
             64
+        );
+        profile.neuralOrderingMinimumLegalMoves = clamped(
+            ini,
+            section,
+            "neural_ordering_minimum_legal_moves",
+            profile.neuralOrderingMinimumLegalMoves,
+            1,
+            64
+        );
+        profile.neuralOrderingBlendPercent = clamped(
+            ini,
+            section,
+            "neural_ordering_blend_percent",
+            profile.neuralOrderingBlendPercent,
+            1,
+            100
         );
         profile.searchStatisticsEnabled = ini.GetBool(
             section,

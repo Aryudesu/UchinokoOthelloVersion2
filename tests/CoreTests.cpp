@@ -9,6 +9,7 @@
 #include "model/BitBoard.h"
 #include "model/MatchResult.h"
 
+#include <algorithm>
 #include <bit>
 #include <array>
 #include <cstdio>
@@ -186,6 +187,47 @@ namespace {
         require(positions.front().turn == Disc::Black, "CSV turn changed");
         require(positions.front().board.black() == initial.black() && positions.front().board.white() == initial.white(), "CSV bitboards changed");
         std::remove(CsvPath);
+
+        const SearchBenchmark::GenerationOptions generation{
+            5,
+            20,
+            30,
+            0x5eed1234U,
+        };
+        std::vector<SearchBenchmark::Position> generated;
+        require(
+            SearchBenchmark::GeneratePositions(generation, generated, error),
+            "Could not generate benchmark positions: " + error
+        );
+        require(
+            generated.size() == generation.count,
+            "Generated benchmark position count is incorrect"
+        );
+        std::vector<SearchBenchmark::Position> repeated;
+        require(
+            SearchBenchmark::GeneratePositions(generation, repeated, error),
+            "Could not repeat benchmark generation: " + error
+        );
+        for (std::size_t i = 0; i < generated.size(); ++i) {
+            const int emptyCount =
+                64 - generated[i].board.count(Disc::Black) -
+                generated[i].board.count(Disc::White);
+            require(
+                generation.minimumEmpty <= emptyCount &&
+                    emptyCount <= generation.maximumEmpty,
+                "Generated benchmark position is outside its phase range"
+            );
+            require(
+                generated[i].board.hasAnyMove(generated[i].turn),
+                "Generated benchmark position has no legal move"
+            );
+            require(
+                generated[i].board.black() == repeated[i].board.black() &&
+                    generated[i].board.white() == repeated[i].board.white() &&
+                    generated[i].turn == repeated[i].turn,
+                "Generated benchmark positions are not reproducible"
+            );
+        }
     }
 
     void testMatchResult() {
@@ -369,6 +411,17 @@ namespace {
     }
 
     void testAiReturnsLegalMove() {
+        OthelloAI configuredDepth(15);
+        require(
+            configuredDepth.depth() == 15,
+            "Configured search depth was unexpectedly capped below 15"
+        );
+        configuredDepth.setDepth(100);
+        require(
+            configuredDepth.depth() == 20,
+            "Search depth upper bound was not enforced"
+        );
+
         BitBoard board;
         OthelloAI ai(3);
 
@@ -485,10 +538,14 @@ namespace {
 
         NeuralMoveOrderer orderer;
         require(
-            orderer.Configure(true, NeuralTestModelPath, 4),
+            orderer.Configure(true, NeuralTestModelPath, 4, 5, 75),
             "Valid neural ordering model was rejected"
         );
         require(orderer.IsActive(), "Neural ordering was not activated");
+        require(
+            orderer.BlendPercent() == 75,
+            "Neural ordering blend percent was not stored"
+        );
 
         BitBoard board;
         std::array<float, NeuralMoveOrderer::OutputSize> scores{};
@@ -497,12 +554,55 @@ namespace {
             "Neural ordering ignored its minimum depth"
         );
         require(
+            !orderer.Score(board, Disc::Black, 4, scores),
+            "Neural ordering ignored its legal-move threshold"
+        );
+        require(
+            orderer.Configure(true, NeuralTestModelPath, 4, 4, 75),
+            "Valid neural ordering thresholds were rejected"
+        );
+        require(
             orderer.Score(board, Disc::Black, 4, scores),
             "Neural ordering inference failed"
         );
         require(
             scores.front() == 0.0f && scores.back() == 63.0f,
             "Neural ordering returned unexpected move scores"
+        );
+
+        BitBoard searchBoard;
+        Disc searchTurn = Disc::Black;
+        const int fallbackLine[] = {
+            4 * 8 + 5, 5 * 8 + 5, 5 * 8 + 4, 3 * 8 + 5,
+            2 * 8 + 4, 5 * 8 + 3, 4 * 8 + 2,
+        };
+        for (const int index : fallbackLine) {
+            require(
+                searchBoard.put(searchTurn, index / 8, index % 8),
+                "Could not build neural-cache test position"
+            );
+            searchTurn = opposite(searchTurn);
+        }
+        OthelloAI cachedAi(4);
+        require(
+            cachedAi.configureNeuralOrdering(
+                true,
+                NeuralTestModelPath,
+                2,
+                1,
+                100
+            ),
+            "Could not configure neural-cache test AI"
+        );
+        const auto cachedMove = cachedAi.chooseMove(searchBoard, searchTurn);
+        require(cachedMove.has_value(), "Neural-cache search returned no move");
+        require(
+            cachedMove->neuralOrderingCalls > 0,
+            "Neural-cache search performed no inference"
+        );
+        require(
+            cachedMove->neuralOrderingCacheHits > 0,
+            "Iterative deepening did not reuse neural inference"
         );
 
         require(
@@ -656,6 +756,10 @@ namespace {
         entry.neuralOrderingEnabled = true;
         entry.neuralOrderingActive = true;
         entry.neuralOrderingMinimumDepth = 4;
+        entry.neuralOrderingMinimumLegalMoves = 3;
+        entry.neuralOrderingBlendPercent = 75;
+        entry.neuralOrderingCalls = 17;
+        entry.neuralOrderingCacheHits = 23;
         entry.moveRow = 2;
         entry.moveCol = 3;
         entry.score = 42;
@@ -686,7 +790,41 @@ namespace {
             "Search statistics calculated rates incorrectly"
         );
         input.close();
+
+        constexpr const char* LegacyCsvPath =
+            "core_test_search_statistics_legacy.csv";
+        std::remove(LegacyCsvPath);
+        const auto extension = lines[0].find(
+            ",neural_minimum_legal_moves"
+        );
+        require(
+            extension != std::string::npos,
+            "Extended search-statistics header was not written"
+        );
+        {
+            std::ofstream legacy(LegacyCsvPath);
+            legacy << lines[0].substr(0, extension) << '\n';
+        }
+        SearchStatisticsEntry legacyEntry = entry;
+        legacyEntry.difficultyName = "TEST";
+        require(
+            SearchStatisticsLogger::Append(LegacyCsvPath, legacyEntry),
+            "Could not append to a legacy search-statistics CSV"
+        );
+        {
+            std::ifstream legacy(LegacyCsvPath);
+            std::string header;
+            std::string row;
+            std::getline(legacy, header);
+            std::getline(legacy, row);
+            require(
+                std::count(header.begin(), header.end(), ',') ==
+                    std::count(row.begin(), row.end(), ','),
+                "Legacy search-statistics row changed its column count"
+            );
+        }
         std::remove(CsvPath);
+        std::remove(LegacyCsvPath);
     }
 }
 
